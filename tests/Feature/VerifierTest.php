@@ -548,6 +548,60 @@ class VerifierTest extends TestCase
         $this->assertSame($errors, $this->verify($reference));
     }
 
+    /** @return array<string, array{string, string, list<array{0: string, 1: string}>, list<string>, string}> */
+    public static function shapeProbes(): array
+    {
+        // wrong readings in alts that only have the shape of a romanization (wildcards, mixed words, subtitle)
+        $wrong = [
+            'k word over two tokens' => ['ヨドバシカメラの歌', 'Yodobashi Camera no Uta', [['ヨドバシカメラ', 'よどばしかめら'], ['の', 'の'], ['歌', 'うき']]],
+            'all back' => ['強風オールバック', 'Kyoufuu All Back', [['強風', 'きょうふき'], ['オールバック', 'おーるばっく']]],
+            'mixed word over two tokens' => ['前向きロケット団!', 'Maemuki Rocket Dan', [['前向き', 'まえむけ'], ['ロケット団', 'ろけっとだん']]],
+            'trailing subtitle' => ['金曜日のおはよう', 'Kinyoubi no Ohayou -love story-', [['金曜日', 'きんようき'], ['の', 'の'], ['おはよう', 'おはよう']]],
+            'merged hatsukoi' => ['初恋サイダー', 'Hatsukoi Cider', [['初恋サイダー', 'はつこきさいだー']]],
+            'merged kakumei' => ['プライド革命', 'Pride Kakumei', [['プライド革命', 'ぷらいどかくめき']]],
+            'merged genjyou' => ['現状ディストラクション', 'Genjyou Destruction', [['現状ディストラクション', 'げんしょうでぃすとらくしょん']]],
+            'one k word over two tokens' => ['東京サマーセッション', 'Tokyo Summer Session', [['東京', 'とうきょき'], ['サマーセッション', 'さまーせっしょん']]],
+            'merged latin letter' => ['少女S', 'Shoujyo S', [['少女S', 'しょうじきえす']]],
+            'merged particle and katakana' => ['創聖のアクエリオン', 'Sousei No Aquarion', [['創聖', 'そうせき'], ['のアクエリオン', 'のあくえりおん']]],
+            'merged latin and kanji' => ['Ahoy!! 我ら宝鐘海賊団☆', 'Ahoy!! Warera Houshou Kaizokudan☆', [['Ahoy我ら', 'あほいわれら'], ['宝鐘', 'ほうしょき'], ['海賊団', 'かいぞくだん']]],
+        ];
+        $probes = [];
+        foreach ($wrong as $name => [$text, $alt, $words]) {
+            foreach (['translation', 'none', 'romaji'] as $kind) {
+                $probes["$name, $kind"] = [$text, $alt, $words, ['romaji_mismatch'], $kind];
+            }
+        }
+        // English alts stay unchecked (the four without a stored annotation are annotated here)
+        $english = [
+            'ghost in a flower' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']]],
+            'aqua iro palette' => ['#あくあ色ぱれっと', 'Aqua Iro Palette', [['あくあ', 'あくあ'], ['色', 'いろ'], ['ぱれっと', 'ぱれっと']]],
+            'kusare gedou' => ['腐れ外道とチョコレゐト', 'Kusare-Gedou and Chocolate', [['腐れ外道', 'くされげどう'], ['と', 'と'], ['チョコレゐト', 'ちょこれゐと']]],
+            'as you like it' => ['お気に召すまま', 'As You Like It', [['お', 'お'], ['気', 'き'], ['に', 'に'], ['召す', 'めす'], ['まま', 'まま']]],
+            'hated by life' => ['命に嫌われている。', 'Hated By Life.', [['命', 'いのち'], ['に', 'に'], ['嫌われて', 'きらわれて'], ['いる', 'いる']]],
+            'bring it on' => ['劣等上等', 'Bring It On', [['劣等', 'れっとう'], ['上等', 'じょうとう']]],
+            'love trial' => ['恋愛裁判', 'Love Trial', [['恋愛', 'れんあい'], ['裁判', 'さいばん']]],
+        ];
+        foreach ($english as $name => [$text, $alt, $words]) {
+            $probes["$name, translation"] = [$text, $alt, $words, [], 'translation'];
+        }
+        // accepted false rejection: Rain converts, カプチーノ takes "with Cappuccino" in the shape alignment
+        $probes['rain with cappuccino, translation'] = ['雨とカプチーノ', 'Rain with Cappuccino', [['雨', 'あめ'], ['と', 'と'], ['カプチーノ', 'かぷちーの']], ['romaji_mismatch'], 'translation'];
+
+        return $probes;
+    }
+
+    /**
+     * @param  list<array{0: string, 1: string}>  $words
+     * @param  list<string>  $errors
+     */
+    #[DataProvider('shapeProbes')]
+    public function test_shape_of_a_romanization_rejects_wrong_readings(string $text, string $alt, array $words, array $errors, string $altKind): void
+    {
+        $reference = $this->annotated('song', $text, implode('', array_column($words, 1)), $words, $alt, $altKind);
+
+        $this->assertSame($errors, $this->verify($reference));
+    }
+
     public function test_missing_annotation_changes_nothing(): void
     {
         $reference = Reference::query()->create(['kind' => 'song', 'text_ja' => '花', 'text_key' => Reference::keyFor('花')]);

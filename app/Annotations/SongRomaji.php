@@ -65,7 +65,7 @@ class SongRomaji
 
     /**
      * @param  list<array{surface: string, reading: string}>  $words
-     * @return list<array{class: 'L'|'K'|'J', key: string, reading: string, spoken: string}>
+     * @return list<array{class: 'L'|'K'|'M'|'J', key: string, reading: string, spoken: string}>
      */
     private static function classify(array $words): array
     {
@@ -76,6 +76,9 @@ class SongRomaji
                 'class' => match (true) {
                     ! Kana::hasJapanese($w['surface']) => 'L',
                     preg_match('/^[\x{30A1}-\x{30FA}ー]+$/u', $key) === 1 => 'K',
+                    // mixed (ロケット団, のアクエリオン, Ahoy我ら); ゐ/ゑ in a katakana word (チョコレゐト) are styling
+                    preg_match('/[\x{30A1}-\x{30FA}a-z0-9]/u', $key) === 1
+                        && preg_match('/[\x{3041}-\x{308F}\x{3092}-\x{3096}々'.Kana::KANJI.']/u', $key) === 1 => 'M',
                     default => 'J',
                 },
                 'key' => $key,
@@ -90,16 +93,21 @@ class SongRomaji
      * The alt split on whitespace and symbols (apostrophes kept inside a token), each token with
      * whether it is glued to the previous one. A Latin word of the title glued to romaji in one
      * token (YUMEbiyori, Ainikite) is split off; a run over both pieces still sees the original.
+     * The third field marks a token that opens a subtitle (after whitespace and - ( ～ 「 …).
      *
-     * @param  list<array{class: 'L'|'K'|'J', key: string, reading: string, spoken: string}>  $words
-     * @return list<array{0: string, 1: bool}>
+     * @param  list<array{class: 'L'|'K'|'M'|'J', key: string, reading: string, spoken: string}>  $words
+     * @return list<array{0: string, 1: bool, 2: bool}>
      */
     private static function tokens(string $alt, array $words): array
     {
         $tokens = [];
-        foreach (preg_split("/[^\p{L}\p{M}\p{N}'’]+/u", $alt) ?: [] as $token) {
+        $end = 0;
+        preg_match_all("/[\p{L}\p{M}\p{N}'’]+/u", $alt, $matches, PREG_OFFSET_CAPTURE);
+        foreach ($matches[0] as [$token, $offset]) {
+            $subtitle = preg_match('/\s[-(\[（【「『~～]/u', substr($alt, $end, $offset - $end)) === 1;
+            $end = $offset + strlen($token);
             if (($token = trim($token, "'’")) !== '') {
-                $tokens[] = [$token, false];
+                $tokens[] = [$token, false, $subtitle];
             }
         }
         foreach ($words as $word) {
@@ -107,7 +115,7 @@ class SongRomaji
             if ($word['class'] !== 'L' || mb_strlen($key) < 2 || in_array($key, array_map(fn (array $t) => Verifier::normalize($t[0]), $tokens), true)) {
                 continue;
             }
-            foreach ($tokens as $k => [$text, $glued]) {
+            foreach ($tokens as $k => [$text, $glued, $subtitle]) {
                 $lower = mb_strtolower($text);
                 $cut = match (true) {
                     str_starts_with($lower, $key) => mb_strlen($key),
@@ -115,7 +123,7 @@ class SongRomaji
                     default => null,
                 };
                 if ($cut !== null) {
-                    array_splice($tokens, $k, 1, [[mb_substr($text, 0, $cut), $glued], [mb_substr($text, $cut), true]]);
+                    array_splice($tokens, $k, 1, [[mb_substr($text, 0, $cut), $glued, $subtitle], [mb_substr($text, $cut), true, false]]);
                     break;
                 }
             }
@@ -129,8 +137,8 @@ class SongRomaji
      * wildcards and romaji runs. With $shape a run only needs tokens that convert completely to
      * kana, not the readings. Memoised over ($i, $t): at most words × (words + 6) run checks.
      *
-     * @param  list<array{class: 'L'|'K'|'J', key: string, reading: string, spoken: string}>  $words
-     * @param  list<array{0: string, 1: bool}>  $tokens
+     * @param  list<array{class: 'L'|'K'|'M'|'J', key: string, reading: string, spoken: string}>  $words
+     * @param  list<array{0: string, 1: bool, 2: bool}>  $tokens
      * @param  array<string, bool>  $memo
      */
     private static function aligns(array $words, array $tokens, int $i, int $t, bool $shape, array &$memo): bool
@@ -138,7 +146,8 @@ class SongRomaji
         $n = count($words);
         $m = count($tokens);
         if ($i === $n) {
-            return $t === $m;
+            // the shape allows a trailing subtitle (Ohayou -love story-), not just any leftover
+            return $t === $m || ($shape && $tokens[$t][2]);
         }
         $key = $i.','.$t;
         if (isset($memo[$key])) {
@@ -152,9 +161,17 @@ class SongRomaji
             return $memo[$key] = self::aligns($words, $tokens, $i + 1, $t + ($equal ? 1 : 0), $shape, $memo);
         }
 
-        // exactly one token: more would let it eat the first token of a split kanji word
-        if ($word['class'] === 'K' && $t < $m && self::aligns($words, $tokens, $i + 1, $t + 1, $shape, $memo)) {
-            return $memo[$key] = true;
+        // Real: a katakana word takes exactly one token; more would let it eat the first token of a
+        // split kanji word. Shape: katakana and mixed words take 1–3 tokens unconverted.
+        $wildcard = match ($word['class']) {
+            'K' => $shape ? 3 : 1,
+            'M' => $shape ? 3 : 0,
+            default => 0,
+        };
+        for ($b = 1; $b <= $wildcard && $t + $b <= $m; $b++) {
+            if (self::aligns($words, $tokens, $i + 1, $t + $b, $shape, $memo)) {
+                return $memo[$key] = true;
+            }
         }
 
         // A run is one word against 1–6 tokens or several words against one token; never many
@@ -164,12 +181,17 @@ class SongRomaji
         for ($a = 1; $i + $a <= $n && $words[$i + $a - 1]['class'] !== 'L'; $a++) {
             $reading .= $words[$i + $a - 1]['reading'];
             $spoken .= $words[$i + $a - 1]['spoken'];
-            $joined = '';
+            $parts = [];
             for ($b = 1; $b <= ($a === 1 ? self::MAX_RUN_TOKENS : 1) && $t + $b <= $m; $b++) {
-                // separate tokens joined with a space so a token-final n stays ん, as in the whole alt
+                // each separate token converted on its own (no syllable across As|You, Kin|Iro
+                // keeps ん); split-off pieces of one token rejoined
                 [$text, $glued] = $tokens[$t + $b - 1];
-                $joined .= ($b === 1 || $glued ? '' : ' ').$text;
-                if (self::runMatches(Kana::fromRomaji($joined), $reading, $spoken, $shape)
+                if ($glued && $b > 1) {
+                    $parts[count($parts) - 1] .= $text;
+                } else {
+                    $parts[] = $text;
+                }
+                if (self::runMatches(implode('', array_map(Kana::fromRomaji(...), $parts)), $reading, $spoken, $shape)
                     && self::aligns($words, $tokens, $i + $a, $t + $b, $shape, $memo)) {
                     return $memo[$key] = true;
                 }
