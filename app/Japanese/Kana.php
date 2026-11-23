@@ -209,42 +209,67 @@ class Kana
     }
 
     /**
-     * Whether a reading agrees with the kana of its romanization: loosely equal, and every
-     * kana the romaji spells (long vowels included) present in order. The reading may only
-     * add the long vowels romaji commonly omits: う after an o/u-row kana, い after an e-row
-     * kana (きりゅう for Kiryu ok; ほしょう for Houshou, とおこやみ for Tokoyami not).
+     * Whether a reading agrees with the kana of its romanization: every romaji kana present
+     * in order, and the only extra kana are long vowels romaji commonly omits — one directly
+     * after a reading kana that matched and was not itself a long vowel: a ー vowel, う after
+     * an o/u-row kana or い after an e-row kana (きりゅう for Kiryu, ばー for Ba ok;
+     * ほしょう for Houshou, とおこやみ for Tokoyami, おおうかみ for Ookami not).
+     * A ー vowel also matches a long vowel the romaji spells (ちょー for Chou).
      */
     public static function matchesRomaji(string $reading, string $romajiKana): bool
     {
-        $reading = mb_str_split(self::spelledOut($reading));
-        $romaji = mb_str_split(self::spelledOut($romajiKana));
-        if (self::loose(implode('', $reading)) !== self::loose(implode('', $romaji))) {
-            return false;
-        }
-
+        $romaji = array_column(self::spelledOut($romajiKana), 0);
         $k = 0;
-        foreach ($reading as $i => $char) {
-            if ($char === ($romaji[$k] ?? null)) {
+        $previous = null;  // last reading kana
+        $canAdd = false;   // previous kana matched and was not a long vowel
+        foreach (self::spelledOut($reading) as [$char, $fromBar]) {
+            $long = $previous !== null && self::lengthens($previous, $char);
+            $expected = $romaji[$k] ?? null;
+            if ($char === $expected || ($fromBar && $expected !== null && $previous !== null && self::lengthens($previous, $expected))) {
                 $k++;
-
-                continue;
-            }
-            $vowel = $i > 0 ? substr(self::toRomaji($reading[$i - 1]), -1) : '';
-            $omittable = ($char === 'う' && in_array($vowel, ['o', 'u'], true)) || ($char === 'い' && $vowel === 'e');
-            if (! $omittable) {
+                $canAdd = ! $long;
+            } elseif ($canAdd && ($fromBar || ($long && ($char === 'う' || ($char === 'い' && str_ends_with(self::toRomaji($previous), 'e')))))) {
+                $canAdd = false; // romaji omitted this long vowel; at most one, never chained
+            } else {
                 return false;
             }
+            $previous = $char;
         }
 
         return $k === count($romaji);
     }
 
-    /** Hiragana without separators, づ/ぢ as ず/じ, ー as the vowel of the kana before it. */
-    private static function spelledOut(string $kana): string
+    /** Whether $vowel lengthens $kana: あ after a-row, い after i/e-row, う after u/o-row, え after e-row, お after o-row. */
+    private static function lengthens(string $kana, string $vowel): bool
     {
-        $kana = strtr(preg_replace('/[\s・]+/u', '', self::toHiragana($kana)) ?? '', ['づ' => 'ず', 'ぢ' => 'じ']);
+        $allowed = ['a' => ['あ'], 'i' => ['い'], 'u' => ['う'], 'e' => ['い', 'え'], 'o' => ['う', 'お']];
 
-        return preg_replace_callback('/(.)ー/u', fn (array $m) => $m[1].(['a' => 'あ', 'i' => 'い', 'u' => 'う', 'e' => 'え', 'o' => 'お'][substr(self::toRomaji($m[1]), -1)] ?? ''), $kana) ?? $kana;
+        return in_array($vowel, $allowed[substr(self::toRomaji($kana), -1)] ?? [], true);
+    }
+
+    /**
+     * Hiragana as [kana, came from ー] pairs: separators removed, づ/ぢ as ず/じ, small
+     * vowels full-size, ー as the vowel of the kana before it.
+     *
+     * @return list<array{string, bool}>
+     */
+    private static function spelledOut(string $kana): array
+    {
+        $kana = strtr(preg_replace('/[\s・]+/u', '', self::toHiragana($kana)) ?? '', [
+            'づ' => 'ず', 'ぢ' => 'じ', 'ぁ' => 'あ', 'ぃ' => 'い', 'ぅ' => 'う', 'ぇ' => 'え', 'ぉ' => 'お',
+        ]);
+        $vowels = ['a' => 'あ', 'i' => 'い', 'u' => 'う', 'e' => 'え', 'o' => 'お'];
+        $out = [];
+        foreach (mb_str_split($kana) as $char) {
+            $previous = end($out);
+            if ($char === 'ー' && $previous !== false && isset($vowels[substr(self::toRomaji($previous[0]), -1)])) {
+                $out[] = [$vowels[substr(self::toRomaji($previous[0]), -1)], true];
+            } elseif ($char !== 'ー') {
+                $out[] = [$char, false];
+            }
+        }
+
+        return $out;
     }
 
     public static function isKanaOnly(string $text): bool

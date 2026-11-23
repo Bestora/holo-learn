@@ -162,8 +162,13 @@ class Verifier
 
         // The alt_kind claim is not trusted: an alt that converts completely to kana is romaji.
         $romaji = Kana::fromRomaji($ref->alt_text);
+        if ($altKind !== 'romaji' && ! Kana::isKanaOnly($romaji)) {
+            return null;
+        }
+        // romaji writes the particle words は/へ/を as spoken (wa/e/o)
+        $spoken = implode('', array_map(fn (array $w) => $w['surface'] === $w['reading'] ? (self::PARTICLES[$w['reading']] ?? $w['reading']) : $w['reading'], $words));
 
-        return $altKind === 'romaji' || Kana::isKanaOnly($romaji) ? Kana::matchesRomaji($reading, $romaji) : null;
+        return Kana::matchesRomaji($reading, $romaji) || Kana::matchesRomaji($spoken, $romaji);
     }
 
     /**

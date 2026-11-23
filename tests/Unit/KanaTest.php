@@ -158,6 +158,26 @@ class KanaTest extends TestCase
             'oo as ou' => ['おうかみ', 'おおかみ', false],
             'extra o after o' => ['とおこやみ', 'とこやみ', false],
             'different kana' => ['ほのお', 'ほむら', false],
+            'bar after a-row, short romaji' => ['ばー', 'ば', true],
+            'bar after o-row, short romaji' => ['ちょー', 'ちょ', true],
+            'bar against spelled ou' => ['ちょー', 'ちょう', true],
+            'bar against spelled oo' => ['ごー', 'ごお', true],
+            'bar against spelled ii' => ['みーむ', 'みいむ', true],
+            'bars in a title' => ['ごーごーゆうれいせん', 'ごごゆうれいせん', true],
+            'bar at the end' => ['ぽっぴっぽー', 'ぽっぴっぽ', true],
+            'small vowel' => ['うっせぇわ', 'うっせえわ', true],
+            'addition after spelled oo' => ['おおうかみ', 'おおかみ', false],
+            'addition after spelled ou' => ['ほううしょう', 'ほうしょう', false],
+            'addition at the end after spelled ou' => ['ほうしょうう', 'ほうしょう', false],
+            'addition after spelled ou mid-name' => ['いちじょううりりか', 'いちじょうりりか', false],
+            'two additions' => ['きりゅうう', 'きりゅ', false],
+            'spelled long vowels' => ['じゅうふうてい', 'じゅうふうてい', true],
+            'omitted ou at the end' => ['りんどう', 'りんど', true],
+            'omitted uu' => ['すう', 'す', true],
+            'spelled oo' => ['おおぞら', 'おおぞら', true],
+            'omitted ii is not an allowed addition' => ['にい', 'に', false],
+            // ponytail: known ceiling: a spurious long vowel where the romaji omits one passes
+            'spurious long vowel' => ['つくもうさな', 'つくもさな', true],
         ];
     }
 
