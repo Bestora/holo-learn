@@ -50,11 +50,13 @@ class DecomposerTest extends TestCase
     {
         $this->verify($this->annotated('song', '花', 'はな', [['花', 'はな']]));
         $this->verify($this->annotated('song', '今日', 'きょう', [['今日', 'きょう']]));
+        $this->verify($this->annotated('name', '桃鈴ねね', 'ももすずねね', [['桃鈴', 'ももすず'], ['ねね', 'ねね']], 'Momosuzu Nene'));
 
         $this->assertSame(['spoon'], $this->item('radical', '匕')->meanings);
         $this->assertSame(['grass'], $this->item('radical', '艹')->meanings); // parent 艸, radical note dropped
         $this->assertSame(['person'], $this->item('radical', '亻')->meanings); // parent wins over 'radical number 9'
         $this->assertSame(['person'], $this->item('radical', '𠆢')->meanings);
+        $this->assertSame(['legs'], $this->item('radical', '儿')->meanings); // radical suffix stripped
         $this->assertSame([], $this->item('radical', '乙')->meanings);
         $this->assertSame([], $this->item('radical', '乙')->readings);
     }

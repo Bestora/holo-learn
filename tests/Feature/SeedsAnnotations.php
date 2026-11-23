@@ -60,6 +60,7 @@ trait SeedsAnnotations
             ['艸', ['そう'], ['grass', 'grass radical (no. 140)'], ['艸']],
             ['艹', [], ['grass', 'radical number 140'], ['艹']],
             ['亻', [], ['radical number 9'], ['亻']],
+            ['儿', [], ['legs radical (no. 10)'], ['儿']],
             ['小', ['しょう', 'ちい'], ['little', 'small'], ['小']],
             ['鳥', ['ちょう', 'とり'], ['bird'], ['鳥']],
             ['遊', ['ゆう', 'あそ'], ['play'], ['辶', '方', '子']],

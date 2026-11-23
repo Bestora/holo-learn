@@ -88,10 +88,10 @@ class Decomposer
                 if ($kanji === null || Kana::kanjiIn($char) === []) {
                     continue; // unknown kanji, or kana/々 inside the word
                 }
-                $rows[] = ['item_id' => $this->item('kanji', $char, $kanji->readings['plain'], self::meanings($kanji))->id, 'position' => $position, 'context_reading' => $kanjiReading];
+                $rows[] = ['item_id' => $this->item('kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings))->id, 'position' => $position, 'context_reading' => $kanjiReading];
                 foreach ($kanji->radicals as $radical) {
                     $source = $dictKanji[self::RADICAL_PARENTS[$radical] ?? ''] ?? $dictKanji[$radical] ?? null;
-                    $rows[] = ['item_id' => $this->item('radical', $radical, [], $source === null ? [] : self::meanings($source))->id, 'position' => $position, 'context_reading' => null];
+                    $rows[] = ['item_id' => $this->item('radical', $radical, [], $source === null ? [] : self::meanings($source->meanings))->id, 'position' => $position, 'context_reading' => null];
                 }
             }
             if (isset($vocab[$i])) {
@@ -153,14 +153,22 @@ class Decomposer
     }
 
     /**
-     * Meanings without radical-catalogue notes ("grass radical (no. 140)", "radical number 9").
+     * Meanings with radical-catalogue notes stripped ("legs radical (no. 10)" → "legs");
+     * entries left empty or numeric ("radical number 9") are dropped.
      *
+     * @param  list<string>  $meanings
      * @return list<string>
      */
-    private static function meanings(DictKanji $kanji): array
+    private static function meanings(array $meanings): array
     {
-        return array_values(array_filter($kanji->meanings, fn (string $m) => preg_match('/radical\b.*\b(no\.?|number)\s*\d+/i', $m) !== 1
-            && preg_match('/^(kangxi )?radical/i', $m) !== 1));
+        $stripped = preg_replace([
+            '/^\s*kangxi radical\s*\d*/i',
+            '/(\s*radical)?\s*\((no\.?|number)\s*\d+\)?\s*$/i', // "(no. 10)", "radical (number 10"
+            '/\s*radical\s+(no\.?|number)\s*\d+\s*$/i',
+            '/\s*\bradical\s*$/i',
+        ], '', $meanings);
+
+        return array_values(array_unique(array_filter(array_map('trim', $stripped), fn (string $m) => preg_match('/^\d*$/', $m) !== 1)));
     }
 
     /**
