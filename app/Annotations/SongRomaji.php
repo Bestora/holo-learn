@@ -204,7 +204,10 @@ class SongRomaji
     private static function runMatches(string $romaji, string $reading, string $spoken, bool $shape): bool
     {
         if ($shape) {
-            return Kana::isKanaOnly($romaji);
+            // plausible length too: `A` (1 kana) is no romanization of ざんこくなてんしの (9)
+            [$r, $t] = [mb_strlen(Kana::loose($reading)), mb_strlen(Kana::loose($romaji))];
+
+            return Kana::isKanaOnly($romaji) && $t >= intdiv($r + 1, 2) && $t <= 2 * $r;
         }
         foreach (array_unique([$reading, $spoken, self::mergeN($reading), self::mergeN($spoken)]) as $variant) {
             if (Kana::matchesRomaji($variant, $romaji)) {

@@ -580,6 +580,8 @@ class VerifierTest extends TestCase
             'hated by life' => ['命に嫌われている。', 'Hated By Life.', [['命', 'いのち'], ['に', 'に'], ['嫌われて', 'きらわれて'], ['いる', 'いる']]],
             'bring it on' => ['劣等上等', 'Bring It On', [['劣等', 'れっとう'], ['上等', 'じょうとう']]],
             'love trial' => ['恋愛裁判', 'Love Trial', [['恋愛', 'れんあい'], ['裁判', 'さいばん']]],
+            // a shape run needs a plausible kana length: `A` (1 kana) cannot stand for ざんこくなてんしの
+            'cruel angel' => ['残酷な天使のテーゼ', "A Cruel Angel's Thesis", [['残酷な', 'ざんこくな'], ['天使', 'てんし'], ['の', 'の'], ['テーゼ', 'てーぜ']]],
         ];
         foreach ($english as $name => [$text, $alt, $words]) {
             $probes["$name, translation"] = [$text, $alt, $words, [], 'translation'];
