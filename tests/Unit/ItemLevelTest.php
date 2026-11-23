@@ -41,7 +41,7 @@ class ItemLevelTest extends TestCase
     public function test_loanword_vocab(): void
     {
         $this->assertSame([2, false], ItemLevel::vocab(true, []));
-        $this->assertSame([2, true], ItemLevel::vocab(false, []));
+        $this->assertSame([3, false], ItemLevel::vocab(false, [])); // early vocabulary, never special
     }
 
     public function test_kanji_vocab_takes_highest_kanji_level(): void

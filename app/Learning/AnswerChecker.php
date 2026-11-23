@@ -29,20 +29,30 @@ class AnswerChecker
         return false;
     }
 
-    /** @param list<string> $meanings */
-    public static function meaning(string $input, array $meanings): bool
+    /**
+     * Exact (normalised) match, or a typo: no tolerance up to 4 characters, 1 edit up to 7, else 2.
+     * A typo match that spells another item's meaning (`son` for 'sun') is not one.
+     *
+     * @param  list<string>  $meanings
+     * @param  array<string, true>  $otherMeanings  normalised meanings of all other items
+     */
+    public static function meaning(string $input, array $meanings, array $otherMeanings = []): bool
     {
         $input = self::normalizeMeaning($input);
         if ($input === '') {
             return false;
         }
 
-        foreach ($meanings as $meaning) {
-            $meaning = self::normalizeMeaning($meaning);
-            if ($meaning === '') {
-                continue;
-            }
-            if ($input === $meaning || levenshtein($input, $meaning) <= (mb_strlen($meaning) >= 8 ? 2 : 1)) {
+        $normalized = array_values(array_filter(array_map(self::normalizeMeaning(...), $meanings), fn (string $m) => $m !== ''));
+        if (in_array($input, $normalized, true)) {
+            return true;
+        }
+        if (isset($otherMeanings[$input])) {
+            return false;
+        }
+        foreach ($normalized as $meaning) {
+            $length = mb_strlen($meaning);
+            if ($length > 4 && levenshtein($input, $meaning) <= ($length >= 8 ? 2 : 1)) {
                 return true;
             }
         }

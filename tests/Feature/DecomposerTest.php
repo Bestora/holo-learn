@@ -299,7 +299,7 @@ class DecomposerTest extends TestCase
         $item = $this->item('vocab', $surface);
         $this->assertSame([$reading], $item->readings);
         $this->assertSame($meanings, $item->meanings);
-        $this->assertSame([2, $special], $this->level('vocab', $surface));
+        $this->assertSame([$special ? 3 : 2, false], $this->level('vocab', $surface)); // uncommon: level 3, never special
     }
 
     public function test_reverify_removes_vocab_items_without_references(): void

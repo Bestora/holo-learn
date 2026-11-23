@@ -4,7 +4,7 @@ namespace App\Learning;
 
 /**
  * Learning level (lower = learned earlier) and special flag of an item, from dictionary
- * metadata. Kana 0–1, katakana loanwords 2, kanji by JLPT 10–13, by school grade 21–28,
+ * metadata. Kana 0–1, katakana loanwords 2 (common) or 3, kanji by JLPT 10–13, by school grade 21–28,
  * everything else 40 and special (an optional bonus, never blocks the basics).
  * Every method returns [level, is_special].
  */
@@ -41,7 +41,7 @@ final class ItemLevel
     public static function vocab(bool $common, array $kanji): array
     {
         if ($kanji === []) {
-            return [2, ! $common];
+            return [$common ? 2 : 3, false]; // loanwords: early vocabulary, never special
         }
 
         return [max(array_column($kanji, 0)), ! $common || in_array(true, array_column($kanji, 1), true)];

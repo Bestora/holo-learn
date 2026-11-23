@@ -55,6 +55,53 @@ class AnswerCheckerTest extends TestCase
         $this->assertFalse(AnswerChecker::meaning('flwr', ['flower'])); // 2 edits, short
     }
 
+    /** @return array<string, array{string, list<string>}> */
+    public static function differentWords(): array
+    {
+        return [
+            'now ≠ no' => ['no', ['now']],
+            'no ≠ now' => ['now', ['no']],
+            'I ≠ x' => ['x', ['ego', 'I', 'selfish', 'our', 'oneself']],
+            'I ≠ it' => ['it', ['ego', 'I']],
+            'I ≠ in' => ['in', ['I']],
+            'I ≠ is' => ['is', ['I']],
+            'I ≠ if' => ['if', ['I']],
+            'sun ≠ son' => ['son', ['day', 'sun']],
+            'bug ≠ big' => ['big', ['bug']],
+            'bug ≠ bag' => ['bag', ['bug']],
+            'eye ≠ dye' => ['dye', ['eye']],
+            'eye ≠ bye' => ['bye', ['eye']],
+        ];
+    }
+
+    /** @param list<string> $meanings */
+    #[DataProvider('differentWords')]
+    public function test_short_meanings_need_an_exact_answer(string $input, array $meanings): void
+    {
+        $this->assertFalse(AnswerChecker::meaning($input, $meanings));
+    }
+
+    public function test_exact_answers_are_always_right(): void
+    {
+        $this->assertTrue(AnswerChecker::meaning('I', ['ego', 'I']));
+        $this->assertTrue(AnswerChecker::meaning('now', ['now'], ['no' => true]));
+        $this->assertTrue(AnswerChecker::meaning('Sun', ['day', 'sun']));
+    }
+
+    public function test_tolerance_by_length(): void
+    {
+        $this->assertTrue(AnswerChecker::meaning('horse', ['horses']));   // 6 chars: 1 edit
+        $this->assertFalse(AnswerChecker::meaning('hose', ['horses']));   // 2 edits
+        $this->assertFalse(AnswerChecker::meaning('stars', ['star']));    // 4 chars: exact only
+    }
+
+    public function test_a_fuzzy_match_that_is_another_items_meaning_is_wrong(): void
+    {
+        $this->assertTrue(AnswerChecker::meaning('house', ['horse']));
+        $this->assertFalse(AnswerChecker::meaning('house', ['horse'], ['house' => true]));
+        $this->assertFalse(AnswerChecker::meaning('a House', ['horse'], ['house' => true])); // compared normalised
+    }
+
     public function test_meaning_ignores_articles_to_and_parentheses(): void
     {
         $this->assertTrue(AnswerChecker::meaning('to love', ['love']));

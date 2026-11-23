@@ -58,17 +58,45 @@ class Question
         };
     }
 
-    /** Short meaning for an option: the shortest of the first three without parenthesised parts. */
+    /**
+     * The meaning an option shows: the first meaning with a letter, parenthesised parts removed, cut at
+     * the first ; or , when longer than 40 characters. Loanwords prefer their first meaning of at most
+     * three words (アイドル: "Japanese idol", not the long description).
+     */
     public static function displayMeaning(Item $item): string
     {
-        $meanings = array_map(
-            fn (string $m) => mb_trim(preg_replace('/\s+/u', ' ', preg_replace('/\([^)]*\)/u', '', $m) ?? '') ?? ''),
-            array_slice($item->meanings, 0, 3),
-        );
-        $meanings = array_filter($meanings, fn (string $m) => $m !== '');
-        usort($meanings, fn (string $a, string $b) => mb_strlen($a) <=> mb_strlen($b));
+        $meanings = array_values(array_filter(array_map(self::stripped(...), $item->meanings), fn (string $m) => preg_match('/\p{L}/u', $m) === 1));
+        if (self::isLoanword($item)) {
+            foreach ($meanings as $meaning) {
+                if (count(explode(' ', $meaning)) <= 3) {
+                    return $meaning;
+                }
+            }
+        }
+        $meaning = $meanings[0] ?? '';
+        if (mb_strlen($meaning) > 40 && preg_match('/^([^;,]*)[;,]/u', $meaning, $m) === 1 && mb_strlen(mb_trim($m[1])) >= 3) {
+            return mb_trim($m[1]);
+        }
 
-        return $meanings[0] ?? '';
+        return $meaning;
+    }
+
+    /**
+     * Meanings as intro and reveal list them: the display meaning first.
+     *
+     * @return list<string>
+     */
+    public static function meaningsForDisplay(Item $item): array
+    {
+        $display = self::displayMeaning($item);
+        $rest = array_filter($item->meanings, fn (string $m) => self::stripped($m) !== $display);
+
+        return $display === '' ? $item->meanings : [$display, ...array_values($rest)];
+    }
+
+    private static function stripped(string $meaning): string
+    {
+        return mb_trim(preg_replace('/\s+/u', ' ', preg_replace('/\([^)]*\)/u', '', $meaning) ?? '') ?? '');
     }
 
     /**
