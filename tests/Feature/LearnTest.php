@@ -19,7 +19,7 @@ class LearnTest extends TestCase
     use BuildsLearning;
     use RefreshDatabase;
 
-    private const FORBIDDEN = ['reading', 'romaji', 'meaning', 'meanings', 'readings', 'context_reading', 'alt_text', 'words', 'occurrence', 'video_id', 'reveal'];
+    private const FORBIDDEN = ['reading', 'romaji', 'meaning', 'meanings', 'readings', 'context_reading', 'alt_text', 'words', 'occurrence', 'video_id', 'reveal', 'name_en', 'name_ja'];
 
     protected function setUp(): void
     {
@@ -162,6 +162,8 @@ class LearnTest extends TestCase
         $this->assertNotSame($intro['reference']['id'], $card['reference']['id']); // no reference twice in a lesson
         $this->assertSame([], array_values(array_intersect(self::FORBIDDEN, $this->keys($card))));
         $this->assertSame(['id', 'kind', 'characters', 'is_special'], array_keys($card['item']));
+        $this->assertSame(['photo_url'], array_keys($card['talent'])); // no name on quiz cards
+        $this->assertArrayHasKey('name_en', $intro['talent']);
         $this->assertSame(1, $props['lesson']['position']);
 
         $this->assertSame($card, $this->learnProps()['card']); // same reference, same option order
@@ -456,13 +458,89 @@ class LearnTest extends TestCase
 
         $this->assertTrue($card['is_name_reading']);
         $this->assertSame([1], $card['reference']['highlight']);
-        $this->assertNull($card['talent']['name_en']); // the romaji name would give the reading away
+        $this->assertSame(['photo_url'], array_keys($card['talent'])); // the romaji name would give the reading away
         $result = $this->answer($kanji->id, 'takanashi');
         $this->assertTrue($result['correct']);
         $this->assertSame(['たかなし'], $result['expected']);
         $this->assertTrue($result['reveal']['is_name']);
         $this->assertSame('Takanashi Kiara', $result['reveal']['alt_text']);
         $this->assertSame('たかなし', $result['reveal']['context_reading']);
+    }
+
+    /** @return iterable<string, array{string, string, string, int, string, list<int>, list<int>, bool}> */
+    public static function wordSpans(): iterable
+    {
+        // [ref kind, text, item, stage, field, highlight, word, is_name_reading]
+        yield '亡 in a song, reading' => ['song', '花に亡霊', 'kanji:亡', 2, 'reading', [2], [2, 3], false];
+        yield '亡 in a song, meaning' => ['song', '花に亡霊', 'kanji:亡', 3, 'meaning', [2], [2], false];
+        yield '亡霊 vocab' => ['song', '花に亡霊', 'vocab:亡霊', 2, 'reading', [2], [2, 3], false];
+        yield '小 in a name: whole unit' => ['name', '小鳥遊キアラ', 'kanji:小', 2, 'reading', [0], [0, 1, 2], true];
+        yield '小 in a name, meaning' => ['name', '小鳥遊キアラ', 'kanji:小', 3, 'meaning', [0], [0], false];
+        yield 'ね in a name' => ['name', '桃鈴ねね', 'hiragana:ね', 2, 'reading', [2, 3], [2, 3], false];
+    }
+
+    /**
+     * @param  list<int>  $highlight
+     * @param  list<int>  $word
+     */
+    #[DataProvider('wordSpans')]
+    public function test_word_span_of_the_asked_reading(string $kind, string $text, string $item, int $stage, string $field, array $highlight, array $word, bool $nameReading): void
+    {
+        $refs = [
+            '花に亡霊' => fn () => $this->makeRef([[$bou = $this->makeItem('kanji', '亡', ['ぼう'], ['deceased'], 10), 2, 'ぼうれい'],
+                [$this->makeItem('vocab', '亡霊', ['ぼうれい'], ['ghost'], 11), 2, 'ぼうれい']], text: $text, words: [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']]),
+            '小鳥遊キアラ' => fn () => $this->makeRef([[$this->makeItem('kanji', '小', ['しょう'], ['little'], 10), 0, 'たかなし']], kind: 'name', text: $text,
+                words: [['小', 'たか', 0], ['鳥遊', 'なし', 0], ['キアラ', 'きあら', 1]]),
+            '桃鈴ねね' => fn () => $this->makeRef([[$this->kana('ね'), 2], [$this->kana('ね'), 3]], kind: 'name', text: $text,
+                words: [['桃鈴', 'ももすず', 0], ['ねね', 'ねね', 1]]),
+        ];
+        $refs[$text]();
+        [$itemKind, $characters] = explode(':', $item);
+        $user = $this->learner();
+        $this->review($user, Item::query()->where(['kind' => $itemKind, 'characters' => $characters])->sole(), $stage);
+        $this->actingAs($user);
+
+        $card = $this->learnProps()['card'];
+
+        $this->assertSame($field, $card['field']);
+        $this->assertSame(['highlight' => $highlight, 'word' => $word], array_intersect_key($card['reference'], ['highlight' => 1, 'word' => 1]));
+        $this->assertSame($nameReading, $card['is_name_reading']);
+    }
+
+    public function test_word_span_falls_back_to_highlight_when_words_do_not_align(): void
+    {
+        $kanji = $this->makeItem('kanji', '亡', ['ぼう'], ['deceased'], 10);
+        $this->makeRef([[$kanji, 2, 'ぼうれい']], text: '花に亡霊', words: [['花', 'はな'], ['亡霊', 'ぼうれい']]);
+        $user = $this->learner();
+        $this->review($user, $kanji, 2);
+        $this->actingAs($user);
+
+        $this->assertSame([2], $this->learnProps()['card']['reference']['word']);
+    }
+
+    public function test_start_is_idempotent(): void
+    {
+        config(['hololearn.lesson_size' => 1]);
+        $ne = $this->kana('ね');
+        $this->withRefs($ne, 3);
+        $user = $this->learner();
+        $this->review($user, $ne, 2);
+        $this->actingAs($user);
+
+        $card = $this->learnProps()['card'];
+        $this->post(route('learn.start'))->assertRedirect(route('learn.index'));
+        $this->post(route('learn.start'))->assertRedirect(route('learn.index'));
+        $this->assertSame(1, Lesson::query()->count()); // the open lesson stays
+        $this->assertSame($card, $this->learnProps()['card']);
+
+        $this->answer($ne->id, 'ne'); // finishes the lesson
+        Review::query()->update(['due_at' => now()->subMinute()]);
+        $this->post(route('learn.start'));
+        $this->post(route('learn.start'));
+        $this->assertNotNull($this->learnProps()['card']);
+        $this->post(route('learn.start'));
+        $this->assertSame(2, Lesson::query()->count());
+        $this->assertSame(1, Lesson::query()->whereNull('finished_at')->count());
     }
 
     public function test_choice_falls_back_to_typed_without_enough_distractors(): void

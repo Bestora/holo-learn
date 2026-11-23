@@ -53,8 +53,9 @@ trait BuildsLearning
      * A reference linking the given items, with an annotation and one live occurrence (unless $talent is false).
      *
      * @param  list<array{0: Item, 1: int, 2?: ?string}>  $links  [item, position, context_reading]
+     * @param  ?list<array{0: string, 1: string, 2?: int}>  $words  [surface, reading, unit]; default: the whole text as one word
      */
-    protected function makeRef(array $links, string $status = 'verified', string $kind = 'song', ?string $text = null, Talent|false|null $talent = null, ?string $alt = null): Reference
+    protected function makeRef(array $links, string $status = 'verified', string $kind = 'song', ?string $text = null, Talent|false|null $talent = null, ?string $alt = null, ?array $words = null): Reference
     {
         $text ??= 'テキスト'.++$this->sequence;
         $reference = Reference::query()->create([
@@ -62,7 +63,7 @@ trait BuildsLearning
         ]);
         Annotation::query()->create([
             'reference_id' => $reference->id, 'reading_kana' => 'てきすと', 'meaning_en' => 'Text '.$this->sequence,
-            'alt_kind' => 'translation', 'model' => 'test', 'words' => [['surface' => $text, 'reading' => 'てきすと', 'ok' => true]],
+            'alt_kind' => 'translation', 'model' => 'test', 'words' => array_map(fn (array $w) => ['surface' => $w[0], 'reading' => $w[1], 'ok' => true] + (isset($w[2]) ? ['unit' => $w[2]] : []), $words ?? [[$text, 'てきすと']]),
         ]);
         foreach ($links as $link) {
             $link[0]->references()->attach($reference->id, ['position' => $link[1], 'context_reading' => $link[2] ?? null]);

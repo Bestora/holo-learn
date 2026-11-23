@@ -2,6 +2,7 @@
 
 namespace App\Learning;
 
+use App\Annotations\Verifier;
 use App\Models\Item;
 use App\Models\Occurrence;
 use App\Models\Reference;
@@ -82,18 +83,21 @@ class Cards
         $card = [
             'type' => $pending['type'],
             'item' => ['id' => $item->id, 'kind' => $item->kind, 'characters' => $item->characters, 'is_special' => $item->is_special],
-            'reference' => ['id' => $reference->id, 'kind' => $reference->kind, 'text_ja' => $reference->text_ja, 'highlight' => $links['positions']],
-            'talent' => $talent === null ? null : [
-                'name_ja' => $talent->name_ja,
-                // a name reference's romaji name is its reading
-                'name_en' => $quiz && $reference->kind === 'name' ? null : $talent->name_en,
-                'photo_url' => $talent->photo_url,
+            'reference' => [
+                'id' => $reference->id, 'kind' => $reference->kind, 'text_ja' => $reference->text_ja,
+                'highlight' => $links['positions'], 'word' => $this->word($item, $reference, $pending['field'], $links['positions']),
             ],
+            // quiz: no name, a talent's name can spell the asked reading (Momosuzu Nene → ね)
+            'talent' => match (true) {
+                $talent === null => null,
+                $quiz => ['photo_url' => $talent->photo_url],
+                default => ['name_ja' => $talent->name_ja, 'name_en' => $talent->name_en, 'photo_url' => $talent->photo_url],
+            },
             'field' => $pending['field'],
             'mode' => $pending['mode'],
             'options' => $pending['options'],
             'remaining_references' => $this->picker->remaining($item, $reference->id),
-            'is_name_reading' => $reference->kind === 'name' && $pending['field'] === 'reading' && in_array($item->kind, ['kanji', 'vocab'], true),
+            'is_name_reading' => $reference->kind === 'name' && $pending['field'] === 'reading' && $item->kind === 'kanji',
         ];
         if (! $quiz) {
             $card['reveal'] = Reveal::build($item, $reference, $occurrence, $links['context_readings'][0] ?? null);
@@ -111,6 +115,35 @@ class Cards
         [$item, $reference, $occurrence] = $this->load($pending);
 
         return Reveal::build($item, $reference, $occurrence, $this->picker->links($item, $reference->id)['context_readings'][0] ?? null);
+    }
+
+    /**
+     * Positions of the whole word whose reading is asked: the annotation word holding the item (a kanji
+     * in a name: its whole unit); vocab always its word. Kana, radicals and kanji meanings: the highlight,
+     * as when the words do not align with the text.
+     *
+     * @param  list<int>  $highlight
+     * @return list<int>
+     */
+    private function word(Item $item, Reference $reference, string $field, array $highlight): array
+    {
+        if ($highlight === [] || ! ($item->kind === 'vocab' || ($item->kind === 'kanji' && $field === 'reading'))) {
+            return $highlight;
+        }
+        $words = $reference->annotation->words ?? [];
+        $aligned = Verifier::align($reference->text_ja, array_column($words, 'surface'));
+        foreach ($aligned ?? [] as $i => $chars) {
+            if (in_array($highlight[0], array_column($chars, 1), true)) {
+                $unit = $reference->kind === 'name' ? ($words[$i]['unit'] ?? null) : null;
+                $indexes = $unit === null ? [$i] : array_keys(array_filter($words, fn (array $w) => ($w['unit'] ?? null) === $unit));
+                $positions = array_unique(array_merge(...array_map(fn (int $j) => array_column($aligned[$j], 1), $indexes)));
+                sort($positions);
+
+                return $positions;
+            }
+        }
+
+        return $highlight;
     }
 
     /**
