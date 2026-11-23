@@ -408,13 +408,15 @@ class VerifierTest extends TestCase
             'latin word in title, wrong' => ['Ahoy!! 我ら宝鐘海賊団☆', 'Ahoy!! Warera Houshou Kaizokudan☆', [['Ahoy', 'あほい'], ['我ら', 'われら'], ['宝鐘', 'ほしょう'], ['海賊団', 'かいぞくだん']], 'romaji', 'あほいわれらほしょうかいぞくだん', ['romaji_mismatch']],
             'latin letter in title' => ['少女S', 'Shoujyo S', [['少女', 'しょうじょ'], ['S', 'えす']], 'romaji', 'しょうじょえす', []],
             'latin letter in title, wrong' => ['少女S', 'Shoujyo S', [['少女', 'しょじょ'], ['S', 'えす']], 'romaji', 'しょじょえす', ['romaji_mismatch']],
-            'latin letter missing from romaji keeps its reading' => ['少女S', 'Shoujyo', [['少女', 'しょうじょ'], ['S', 'えす']], 'romaji', 'しょうじょえす', ['romaji_mismatch']],
+            // Latin words are positional and never compared: absent from the alt, they take no token
+            'latin letter missing from romaji' => ['少女S', 'Shoujyo', [['少女', 'しょうじょ'], ['S', 'えす']], 'romaji', 'しょうじょえす', []],
             'latin letter only in title' => ['S', 'S', [['S', 'えす']], 'romaji', 'えす', []],
             // "love" is removed from the alt, which stays English: no check, as before
             'latin word not repeated' => ['LOVE受信、ヒクツ発信', "I'm difficult, but love me", [['LOVE', 'らぶ'], ['受信', 'じゅしん'], ['ヒクツ', 'ひくつ'], ['発信', 'はっしん']], 'translation', 'らぶじゅしんひくつはっしん', []],
             'latin word not repeated, wrong (unchecked)' => ['LOVE受信、ヒクツ発信', "I'm difficult, but love me", [['LOVE', 'らぶ'], ['受信', 'じゅうしん'], ['ヒクツ', 'ひくつ'], ['発信', 'はっしん']], 'translation', 'らぶじゅうしんひくつはっしん', []],
             'l in romaji' => ['バラライカ', 'Balalaika', [['バラライカ', 'ばららいか']], 'romaji', 'ばららいか', []],
-            'l in romaji, wrong' => ['バラライカ', 'Balalaika', [['バラライカ', 'ばらいか']], 'romaji', 'ばらいか', ['kana_mismatch', 'romaji_mismatch']],
+            // a katakana word may take its token unchecked: kana_mismatch is what rejects it
+            'l in romaji, wrong' => ['バラライカ', 'Balalaika', [['バラライカ', 'ばらいか']], 'romaji', 'ばらいか', ['kana_mismatch']],
         ];
     }
 
@@ -426,6 +428,62 @@ class VerifierTest extends TestCase
     public function test_song_romaji_probes(string $text, string $alt, array $words, string $altKind, string $reading, array $errors): void
     {
         $reference = $this->annotated('song', $text, $reading, $words, $alt, $altKind);
+
+        $this->assertSame($errors, $this->verify($reference));
+    }
+
+    /** @return array<string, array{string, string, list<array{0: string, 1: string}>, list<string>, 4?: string}> */
+    public static function alignmentProbes(): array
+    {
+        $rejected = ['romaji_mismatch'];
+
+        return [
+            // katakana words may stand for their English spelling (1–3 tokens)
+            'hatsukoi cider' => ['初恋サイダー', 'Hatsukoi Cider', [['初恋', 'はつこい'], ['サイダー', 'さいだー']], []],
+            'renai circulation' => ['恋愛サーキュレーション', 'Renai Circulation', [['恋愛', 'れんあい'], ['サーキュレーション', 'さーきゅれーしょん']], []],
+            'pride kakumei' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくめい']], []],
+            'zettai idol' => ['絶対アイドル辞めないで', 'Zettai idol yamenaide', [['絶対', 'ぜったい'], ['アイドル', 'あいどる'], ['辞めないで', 'やめないで']], []],
+            'moonlight densetsu' => ['ムーンライト伝説', 'Moonlight Densetsu', [['ムーンライト', 'むーんらいと'], ['伝説', 'でんせつ']], []],
+            'pokemon master' => ['めざせポケモンマスター', 'Mezase Pokemon Master', [['めざせ', 'めざせ'], ['ポケモン', 'ぽけもん'], ['マスター', 'ますたー']], []],
+            'katakana word over two tokens' => ['ヨドバシカメラの歌', 'Yodobashi Camera no Uta', [['ヨドバシカメラ', 'よどばしかめら'], ['の', 'の'], ['歌', 'うた']], []],
+            'latin word at the end' => ['花咲く☆最強レジェンドDays', 'Hanasaku Saikyou Legend DAYS', [['花咲く', 'はなさく'], ['最強', 'さいきょう'], ['レジェンド', 'れじぇんど'], ['Days', 'でいず']], []],
+            'latin word absent from alt' => ['コングラッCHU☆マーチ', 'Congrachu☆march', [['コングラッ', 'こんぐらっ'], ['CHU', 'ちゅう'], ['マーチ', 'まーち']], []],
+            'tetoris' => ['テトリス', 'Tetoris', [['テトリス', 'てとりす']], []],
+            'bibbidiba' => ['ビビデバ', 'Bibbidiba', [['ビビデバ', 'びびでば']], []],
+            'moechakkafire' => ['モエチャッカファイア', 'Moechakkafire', [['モエチャッカファイア', 'もえちゃっかふぁいあ']], []],
+            'particle inside a run' => ['世界は恋に落ちている', 'Sekai wa Koi ni Ochiteiru', [['世界', 'せかい'], ['は', 'は'], ['恋', 'こい'], ['に', 'に'], ['落ちている', 'おちている']], []],
+            'eight words in one token' => ['ねねねねねねねね!大爆走', 'Nenenenenenenene! Dai Bakusou', [...array_fill(0, 8, ['ね', 'ね']), ['大爆走', 'だいばくそう']], []],
+            'latin word glued at the end' => ['会いにKiTE!', 'Ainikite', [['会い', 'あい'], ['に', 'に'], ['KiTE', 'きて']], []],
+            'latin word glued at the start' => ['YUME日和', 'YUMEbiyori', [['YUME', 'ゆめ'], ['日和', 'びより']], []],
+            'latin word glued, kanji word wrong' => ['YUME日和', 'YUMEbiyori', [['YUME', 'ゆめ'], ['日和', 'ひより']], $rejected],
+            'glued split cannot drop letters' => ['日和YUME', 'BiyoriYUMEx', [['日和', 'びより'], ['YUME', 'ゆめ']], $rejected],
+            'token-final n stays n' => ['金色', 'Kin Iro', [['金色', 'きんいろ']], []],
+            // ponytail: known ceiling: romaji n before a vowel is ambiguous, so ん+vowel matches na-row romaji
+            'n before vowel is ambiguous' => ['奏', 'Kanade', [['奏', 'かんあで']], []],
+            // ponytail: known ceiling: a wildcard may take the first token of a kanji word romanized over
+            // two tokens, so a reading matching only the rest passes (the dictionary still keeps it untaught)
+            'wildcard takes part of a split kanji word' => ['サイダー初恋', 'Saida Hatsu Koi', [['サイダー', 'さいだー'], ['初恋', 'こい']], []],
+            'translation is no romaji' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], [], 'translation'],
+            // a kanji word must always be matched by romaji tokens
+            'kakumei wrong' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくべい']], $rejected],
+            'hatsukoi wrong' => ['初恋サイダー', 'Hatsukoi Cider', [['初恋', 'しょれん'], ['サイダー', 'さいだー']], $rejected],
+            'kanji word without romaji' => ['ふわふわ時間', 'Fuwafuwa Time', [['ふわふわ', 'ふわふわ'], ['時間', 'じかん']], $rejected],
+            'ora as orera' => ['俺ら東京さ行ぐだ', 'Ora Tōkyō sa Iguda', [['俺ら', 'おれら'], ['東京', 'とうきょう'], ['さ', 'さ'], ['行ぐだ', 'いぐだ']], $rejected],
+            'katakana word cannot swallow a kanji word' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かく']], $rejected],
+            'katakana wildcard cannot take the kanji token' => ['革命プライド', 'Kakumei Pride', [['革命', 'ぷらいど'], ['プライド', 'ぷらいど']], $rejected],
+            'typo in alt' => ['夜行性ハイズ', 'Yakousie Haizu', [['夜行性', 'やこうせい'], ['ハイズ', 'はいず']], $rejected],
+            'token left over' => ['初恋サイダー', 'Remix Hatsukoi Cider', [['初恋', 'はつこい'], ['サイダー', 'さいだー']], $rejected],
+        ];
+    }
+
+    /**
+     * @param  list<array{0: string, 1: string}>  $words
+     * @param  list<string>  $errors
+     */
+    #[DataProvider('alignmentProbes')]
+    public function test_song_romaji_alignment(string $text, string $alt, array $words, array $errors, string $altKind = 'romaji'): void
+    {
+        $reference = $this->annotated('song', $text, implode('', array_column($words, 1)), $words, $alt, $altKind);
 
         $this->assertSame($errors, $this->verify($reference));
     }
