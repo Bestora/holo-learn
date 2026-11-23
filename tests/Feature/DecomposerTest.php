@@ -7,6 +7,7 @@ use App\Annotations\Verifier;
 use App\Japanese\Kana;
 use App\Models\Item;
 use App\Models\Reference;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -314,6 +315,19 @@ class DecomposerTest extends TestCase
         $this->assertFalse(Item::query()->where(['kind' => 'vocab', 'characters' => 'オラ'])->exists());
         $this->assertTrue(Item::query()->where(['kind' => 'vocab', 'characters' => 'アイドル'])->exists());
         $this->assertTrue(Item::query()->where(['kind' => 'kanji', 'characters' => '湊'])->exists()); // only vocab is removed
+    }
+
+    public function test_reverify_keeps_orphan_vocab_items_with_reviews(): void
+    {
+        $reviewed = Item::query()->create(['kind' => 'vocab', 'characters' => 'オラ', 'readings' => ['おら'], 'meanings' => ['hola'], 'level' => 2]);
+        Item::query()->create(['kind' => 'vocab', 'characters' => 'レイ', 'readings' => ['れい'], 'meanings' => ['lei'], 'level' => 2]);
+        $reviewed->reviews()->create(['user_id' => User::factory()->create()->id, 'stage' => 3, 'due_at' => now()]);
+
+        $this->artisan('annotations:reverify')->expectsOutputToContain('Vokabeln ohne Referenz entfernt: 1')->assertSuccessful();
+
+        $this->assertTrue(Item::query()->where(['kind' => 'vocab', 'characters' => 'オラ'])->exists()); // learner history kept
+        $this->assertSame(1, $reviewed->reviews()->count());
+        $this->assertFalse(Item::query()->where(['kind' => 'vocab', 'characters' => 'レイ'])->exists());
     }
 
     public function test_kana_words_outside_the_rule_create_no_vocab(): void

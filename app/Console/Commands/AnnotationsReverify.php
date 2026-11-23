@@ -22,8 +22,8 @@ class AnnotationsReverify extends Command
         [$verified, $rejected] = AnnotationsImport::verifyAll($this, $references, $verifier, $decomposer);
         $this->info("verified {$verified}, rejected {$rejected}");
 
-        // vocab made under an older rule (オラ "hola") that no reference links any more
-        $removed = Item::query()->where('kind', 'vocab')->doesntHave('references')->delete();
+        // vocab made under an older rule (オラ "hola") that no reference links any more; kept while a learner reviews it
+        $removed = Item::query()->where('kind', 'vocab')->doesntHave('references')->doesntHave('reviews')->delete();
         $this->info("Vokabeln ohne Referenz entfernt: {$removed}");
 
         return self::SUCCESS;
