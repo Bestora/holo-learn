@@ -3,9 +3,12 @@
 namespace App\Console\Commands;
 
 use App\Holodex\HolodexException;
+use App\Holodex\SongSync;
 use App\Holodex\TalentSync;
+use App\Models\Reference;
 use App\Models\Talent;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Log;
 
 class HolodexSync extends Command
 {
@@ -16,7 +19,7 @@ class HolodexSync extends Command
 
     protected $description = 'Gleicht Talente und Songs mit Holodex ab (ohne Option: beides)';
 
-    public function handle(TalentSync $talents): int
+    public function handle(TalentSync $talents, SongSync $songs): int
     {
         $all = ! $this->option('talents') && ! $this->option('songs');
         $failed = false;
@@ -26,18 +29,57 @@ class HolodexSync extends Command
                 $talents->run();
                 $this->info('Talente: '.Talent::count()
                     .', davon Zweitkanäle: '.Talent::query()->where('is_secondary', true)->count()
-                    .', mit Namens-Referenz: '.Talent::query()->whereHas('occurrences')->count());
+                    .', Namens-Referenzen: '.Reference::query()->where('kind', 'name')->count());
             } catch (HolodexException $e) {
-                $this->error('Talente fehlgeschlagen: '.$e->getMessage());
+                $this->logFailure($e, 'Talente fehlgeschlagen');
                 $failed = true;
             }
         }
 
         if ($all || $this->option('songs')) {
-            // ponytail: --songs and --channel arrive with the song sync (Task 5).
-            $this->warn('Songs: noch nicht implementiert');
+            $failed = ! $this->syncSongs($songs) || $failed;
         }
 
         return $failed ? self::FAILURE : self::SUCCESS;
+    }
+
+    /** @return bool false if any talent failed */
+    private function syncSongs(SongSync $songs): bool
+    {
+        $channel = $this->option('channel');
+        // ponytail: sorted in PHP for "priority asc, nulls last" without raw SQL; ~100 rows.
+        $talents = Talent::query()
+            ->when($channel, fn ($q) => $q->where('holodex_channel_id', $channel))
+            ->orderBy('id')->get()
+            ->sortBy(fn (Talent $t) => $t->priority ?? PHP_INT_MAX);
+
+        if ($talents->isEmpty()) {
+            $this->error($channel ? "Kein Talent mit Kanal {$channel}" : 'Keine Talente – erst --talents abgleichen');
+
+            return false;
+        }
+
+        $ok = true;
+        foreach ($talents as $talent) {
+            try {
+                $created = $songs->run($talent);
+                $this->info("Songs {$talent->name_en}: {$created} neue Fundstellen, "
+                    ."{$songs->skippedNoJapanese} ohne Japanisch, {$songs->skippedMalformed} fehlerhaft, {$songs->requests} Abrufe");
+            } catch (HolodexException $e) {
+                $this->logFailure($e, "Songs {$talent->name_en} ({$talent->holodex_channel_id}) fehlgeschlagen", $talent->holodex_channel_id);
+                $ok = false;
+            }
+        }
+
+        return $ok;
+    }
+
+    private function logFailure(HolodexException $e, string $message, ?string $channelId = null): void
+    {
+        Log::error("Holodex: {$message}", array_filter(
+            ['status' => $e->status, 'path' => $e->path, 'channel_id' => $channelId],
+            fn ($v) => $v !== null,
+        ));
+        $this->error("{$message}: {$e->getMessage()}");
     }
 }

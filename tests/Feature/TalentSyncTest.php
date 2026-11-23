@@ -20,6 +20,8 @@ class TalentSyncTest extends TestCase
 
     private const SUISEI = 'UC5CwaMl1eIgY8h02uZw7u8A';
 
+    private const FUWAMOCO = 'UCt9H_RpQzhxzlyBxFqrdHqA';
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -72,6 +74,7 @@ class TalentSyncTest extends TestCase
         $this->assertSame(53, Talent::count());
         $this->assertSame(53, Reference::count());
         $this->assertSame(53, Occurrence::count());
+        Http::assertSentCount(4);
 
         Http::assertSent(fn ($request) => $request->hasHeader('X-APIKEY', 'test-secret-key')
             && $request->hasHeader('User-Agent', 'holo-learn (+https://holo-learn.u0x.de)')
@@ -287,14 +290,93 @@ class TalentSyncTest extends TestCase
         $this->artisan('holodex:sync', ['--talents' => true])->assertFailed();
     }
 
-    public function test_command_syncs_talents_and_skips_songs_for_now(): void
+    public function test_paging_stops_after_40_pages(): void
     {
-        $this->fakePages([[$this->channel(self::NENE, 'Nene Ch.桃鈴ねね', 'Momosuzu Nene')]]);
+        Http::fake(function ($request) {
+            parse_str((string) parse_url($request->url(), PHP_URL_QUERY), $query);
+
+            return Http::response($this->filler(50, (int) $query['offset']));
+        });
+
+        $this->sync();
+
+        Http::assertSentCount(40);
+    }
+
+    /** @param  list<array{ja: string, en: string}>  $names */
+    private function syncFuwamoco(array $names): void
+    {
+        config(['hololearn.name_overrides.'.self::FUWAMOCO => $names]);
+        $this->fakePages([[$this->channel(self::FUWAMOCO, 'FUWAMOCO Ch. hololive-EN', 'Fuwawa & Mococo Abyssgard', 'English -Advent-')]]);
+        $this->sync();
+    }
+
+    public function test_list_override_creates_one_reference_per_name(): void
+    {
+        $names = [['ja' => 'フワワ・アビスガード', 'en' => 'Fuwawa Abyssgard'], ['ja' => 'モココ・アビスガード', 'en' => 'Mococo Abyssgard']];
+
+        $this->syncFuwamoco($names);
+
+        $this->assertSame('フワワ・アビスガード', Talent::sole()->name_ja);
+        $this->assertSame(
+            ['フワワ・アビスガード' => 'Fuwawa Abyssgard', 'モココ・アビスガード' => 'Mococo Abyssgard'],
+            Reference::query()->orderBy('id')->pluck('alt_text', 'text_ja')->all(),
+        );
+        $this->assertSame(
+            ['name:'.self::FUWAMOCO => 'フワワ・アビスガード', 'name:'.self::FUWAMOCO.':2' => 'モココ・アビスガード'],
+            Occurrence::query()->with('reference')->orderBy('id')->get()->mapWithKeys(fn (Occurrence $o) => [$o->source_id => $o->reference?->text_ja])->all(),
+        );
+
+        $this->syncFuwamoco($names);
+
+        $this->assertSame(2, Reference::count());
+        $this->assertSame(2, Occurrence::count());
+    }
+
+    public function test_shrinking_list_override_removes_surplus_occurrence(): void
+    {
+        $this->syncFuwamoco([['ja' => 'フワワ・アビスガード', 'en' => 'Fuwawa Abyssgard'], ['ja' => 'モココ・アビスガード', 'en' => 'Mococo Abyssgard']]);
+
+        $this->syncFuwamoco([['ja' => 'フワモコ', 'en' => 'FUWAMOCO']]);
+
+        $this->assertSame(['name:'.self::FUWAMOCO], Occurrence::query()->pluck('source_id')->all());
+        $this->assertSame(['フワモコ'], Reference::query()->pluck('text_ja')->all());
+        $this->assertSame('フワモコ', Talent::sole()->name_ja);
+    }
+
+    public function test_configured_list_and_en_overrides(): void
+    {
+        $this->fakePages([[
+            $this->channel(self::FUWAMOCO, 'FUWAMOCO Ch. hololive-EN', 'Fuwawa & Mococo Abyssgard', 'English -Advent-'),
+            $this->channel('UCL_qhgtOy0dy1Agp8vkySQg', 'Mori Calliope Ch. hololive-EN', 'Mori Calliope', 'English -Myth-'),
+        ]]);
+
+        $this->sync();
+
+        $this->assertEqualsCanonicalizing(['フワワ・アビスガード', 'モココ・アビスガード', '森カリオペ'], Reference::query()->pluck('text_ja')->all());
+    }
+
+    public function test_command_syncs_talents_and_songs(): void
+    {
+        Http::fake(fn ($request) => str_contains($request->url(), '/songs/latest')
+            ? Http::response(['total' => 0, 'items' => []])
+            : Http::response([$this->channel(self::NENE, 'Nene Ch.桃鈴ねね', 'Momosuzu Nene')]));
 
         $this->artisan('holodex:sync')
-            ->expectsOutputToContain('Songs: noch nicht implementiert')
+            ->expectsOutputToContain('Namens-Referenzen: 1')
             ->assertSuccessful();
 
         $this->assertSame(1, Talent::count());
+    }
+
+    public function test_command_logs_talent_failure(): void
+    {
+        Log::spy();
+        Http::fake(['*' => Http::response([], 500)]);
+
+        $this->artisan('holodex:sync', ['--talents' => true])->assertFailed();
+
+        Log::shouldHaveReceived('error')->once()->withArgs(fn (string $message, array $context) => $context['status'] === 500
+            && $context['path'] === '/channels');
     }
 }
