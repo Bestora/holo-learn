@@ -13,6 +13,14 @@ use Database\Seeders\KanaSeeder;
 /** Small dictionary and helpers for verifier/decomposer tests. */
 trait SeedsAnnotations
 {
+    /** Real KANJIDIC2 [jlpt (old scale), grade]; radical-only entries have neither. */
+    private const KANJI_LEVELS = [
+        '花' => [4, 1], '亡' => [2, 6], '霊' => [1, 8], '今' => [4, 2], '日' => [4, 1], '宇' => [2, 6], '宙' => [2, 6],
+        '桃' => [1, 8], '鈴' => [1, 8], '宝' => [2, 6], '鐘' => [1, 8], '我' => [1, 6], '海' => [3, 2], '賊' => [1, 8],
+        '団' => [2, 5], '歌' => [3, 2], '来' => [4, 2], '小' => [4, 1], '鳥' => [3, 2], '遊' => [2, 3], '人' => [4, 1],
+        '水' => [4, 1], '一' => [4, 1], '湊' => [null, 9],
+    ];
+
     protected function seedDictionary(): void
     {
         $this->seed(KanaSeeder::class);
@@ -33,12 +41,20 @@ trait SeedsAnnotations
             ['女々しい', 'めめしい', [['effeminate', 'unmanly']]],
             ['駆ける', 'かける', [['to run', 'to dash']]],
             ['出る', 'でる', [['to leave', 'to exit']]],
+            ['湊', 'みなと', [['harbour']]],
+            ['綺麗', 'きれい', [['pretty']]],
+            ['いや', 'いや', [['no']]],
+            ['アイドル', 'アイドル', [['performer with a cultivated image', 'Japanese idol'], ['idol', 'object of worship'], ['icon', 'star']]],
+            ['アイドル', 'アイドル', [['idle']]],
+            ['ミーム', 'ミーム', [['meme']]],
             ['桃鈴', 'ももすず', [['Momosuzu']], true],
             ['桃鈴', 'とうり', [['Touri']], true],
             ['小鳥遊', 'たかなし', [['Takanashi']], true],
         ] as $row) {
             DictWord::query()->forceCreate([
                 'spelling' => $row[0], 'reading' => $row[1], 'glosses' => $row[2], 'is_name' => $row[3] ?? false,
+                // uncommon: 海賊団, 湊, the second アイドル ("idle"), ミーム; names never
+                'common' => ! isset($row[3]) && ! in_array($row[0], ['海賊団', '湊', 'ミーム'], true) && $row[2] !== [['idle']],
             ]);
         }
 
@@ -71,10 +87,12 @@ trait SeedsAnnotations
             ['人', ['じん', 'ひと'], ['person'], ['人']],
             ['水', ['すい', 'みず'], ['water'], ['水']],
             ['一', ['いち', 'ひと'], ['one'], ['一']],
+            ['湊', ['そう', 'みなと'], ['port', 'harbor'], ['一', '氵', '大', '二', '人']],
         ] as [$character, $plain, $meanings, $radicals]) {
             DictKanji::query()->forceCreate([
                 'character' => $character, 'readings' => ['on' => [], 'kun' => [], 'nanori' => [], 'plain' => $plain],
                 'meanings' => $meanings, 'radicals' => $radicals,
+                'jlpt' => self::KANJI_LEVELS[$character][0] ?? null, 'grade' => self::KANJI_LEVELS[$character][1] ?? null,
             ]);
         }
     }

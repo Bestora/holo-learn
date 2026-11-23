@@ -3,6 +3,7 @@
 namespace App\Annotations;
 
 use App\Japanese\Kana;
+use App\Learning\ItemLevel;
 use App\Models\DictKanji;
 use App\Models\DictWord;
 use App\Models\Item;
@@ -11,8 +12,11 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
+ * @phpstan-type Wanted array{readings: list<string>, meanings: list<string>, level: int, is_special: bool}
+ *
  * Links a verified reference to its learning items: every kana of the text, and for each
- * ok word with kanji its kanji, their radicals and (not for names) the word itself.
+ * ok word with kanji its kanji, their radicals and (not for names) the word itself; in song
+ * titles also katakana words from the dictionary (loanwords like アイドル).
  */
 class Decomposer
 {
@@ -63,9 +67,10 @@ class Decomposer
 
     /**
      * Existing items for all wanted keys, missing non-kana ones created; 3 queries at most.
-     * Existing items keep their readings and meanings.
+     * Existing items keep their readings, meanings and level, except that a radical's
+     * level is lowered when a lower-level kanji uses it.
      *
-     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * @param  array<string, ?Wanted>  $wanted
      * @return Collection<string, Item>
      */
     private function items(array $wanted): Collection
@@ -81,21 +86,27 @@ class Decomposer
         };
 
         $items = $find(array_keys($wanted));
-        $missing = array_filter(array_diff_key($wanted, $items->all()));
-        if ($missing !== []) {
-            Item::query()->insertOrIgnore(array_map(function (string $key, array $attributes) {
+        $write = array_filter(array_diff_key($wanted, $items->all()));
+        foreach ($items as $key => $item) {
+            if ($item->kind === 'radical' && $wanted[$key] !== null && $wanted[$key]['level'] < $item->level) {
+                $write[$key] = [...$wanted[$key], 'readings' => $item->readings, 'meanings' => $item->meanings];
+            }
+        }
+        if ($write !== []) {
+            // existing rows only get level and is_special; readings and meanings are never overwritten
+            Item::query()->upsert(array_map(function (string $key, array $attributes) {
                 [$kind, $characters] = explode('|', $key, 2);
 
-                return ['kind' => $kind, 'characters' => $characters, 'readings' => json_encode($attributes['readings'], JSON_UNESCAPED_UNICODE), 'meanings' => json_encode($attributes['meanings'], JSON_UNESCAPED_UNICODE)];
-            }, array_keys($missing), $missing));
-            $items = $items->merge($find(array_keys($missing)));
+                return ['kind' => $kind, 'characters' => $characters, 'readings' => json_encode($attributes['readings'], JSON_UNESCAPED_UNICODE), 'meanings' => json_encode($attributes['meanings'], JSON_UNESCAPED_UNICODE), 'level' => $attributes['level'], 'is_special' => $attributes['is_special']];
+            }, array_keys($write), $write), ['kind', 'characters'], ['level', 'is_special']);
+            $items = $items->merge($find(array_keys($write)));
         }
 
         return $items;
     }
 
     /**
-     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * @param  array<string, ?Wanted>  $wanted
      * @return list<array{string, int, ?string}> [item key, position, context reading]
      */
     private function links(Reference $ref, array &$wanted): array
@@ -116,12 +127,13 @@ class Decomposer
         }
 
         $kanjiWords = array_values(array_filter(array_keys($words), fn ($i) => ($words[$i]['ok'] ?? false) && Kana::kanjiIn($words[$i]['surface']) !== []));
-        if ($kanjiWords === []) {
+        $loanwords = $ref->kind !== 'song' ? [] : array_values(array_filter(array_keys($words), fn ($i) => ($words[$i]['ok'] ?? false) && preg_match('/^[ァ-ヺー]{2,}$/u', $words[$i]['surface']) === 1));
+        if ($kanjiWords === [] && $loanwords === []) {
             return $rows;
         }
 
         $dictKanji = $this->dictKanji($kanjiWords, $words);
-        $vocab = $ref->kind === 'name' ? [] : $this->vocab($kanjiWords, $words, $wanted);
+        $vocab = $ref->kind === 'name' ? [] : $this->vocab($kanjiWords, $loanwords, $words, $dictKanji, $wanted);
 
         // names: a kanji carries the reading of its whole unit, so a wrong split inside a
         // unit (小/たか + 鳥遊/なし) cannot attach a per-word reading
@@ -132,30 +144,32 @@ class Decomposer
             }
         }
 
+        $radicalKanji = []; // radical => levels of the kanji using it
         foreach ($kanjiWords as $i) {
-            $reading = $words[$i]['reading'];
-            $kanjiReading = isset($words[$i]['unit']) ? $unitReadings[$words[$i]['unit']] : $reading;
+            $kanjiReading = isset($words[$i]['unit']) ? $unitReadings[$words[$i]['unit']] : $words[$i]['reading'];
             foreach ($aligned[$i] as [$char, $position]) {
                 $kanji = $dictKanji[$char] ?? null;
                 if ($kanji === null || Kana::kanjiIn($char) === []) {
                     continue; // unknown kanji, or kana/々 inside the word
                 }
-                $rows[] = [self::want($wanted, 'kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings)), $position, $kanjiReading];
+                $level = self::kanjiLevel($kanji);
+                $rows[] = [self::want($wanted, 'kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings), $level), $position, $kanjiReading];
                 foreach ($kanji->radicals as $radical) {
+                    $radicalKanji[$radical][] = $level;
                     $source = $dictKanji[self::RADICAL_PARENTS[$radical] ?? ''] ?? $dictKanji[$radical] ?? null;
-                    $rows[] = [self::want($wanted, 'radical', $radical, [], $source === null ? [] : self::meanings($source->meanings)), $position, null];
+                    $rows[] = [self::want($wanted, 'radical', $radical, [], $source === null ? [] : self::meanings($source->meanings), ItemLevel::radical($radicalKanji[$radical])), $position, null];
                 }
             }
-            if (isset($vocab[$i])) {
-                $rows[] = [$vocab[$i], $aligned[$i][0][1], $reading];
-            }
+        }
+        foreach ($vocab as $i => $key) {
+            $rows[] = [$key, $aligned[$i][0][1], $words[$i]['reading']];
         }
 
         return $rows;
     }
 
     /**
-     * The kanji of the given words, their radicals and the radicals' parent kanji.
+     * The kanji of the given words and their lemmas, their radicals and the radicals' parent kanji.
      *
      * @param  list<int>  $indexes
      * @param  list<array<string, mixed>>  $words
@@ -163,7 +177,7 @@ class Decomposer
      */
     private function dictKanji(array $indexes, array $words): Collection
     {
-        $characters = array_merge(...array_map(fn ($i) => Kana::kanjiIn($words[$i]['surface']), $indexes));
+        $characters = array_merge(...array_map(fn ($i) => Kana::kanjiIn($words[$i]['surface'].($words[$i]['lemma'] ?? '')), $indexes));
         $kanji = DictKanji::query()->whereIn('character', array_unique($characters))->get();
         $radicals = $kanji->pluck('radicals')->flatten()->unique()->all();
         $more = [...$radicals, ...array_values(array_intersect_key(self::RADICAL_PARENTS, array_flip($radicals)))];
@@ -173,20 +187,30 @@ class Decomposer
     }
 
     /**
-     * Vocab item per word index: the surface if it is in the dictionary with the word's
-     * reading, else the lemma (the verifier accepted the word through it).
+     * Vocab item per word index. Kanji words: the surface if it is in the dictionary with
+     * the word's reading, else the lemma (the verifier accepted the word through it).
+     * Loanwords: the surface if it is in the dictionary, with the meanings of all its rows.
      *
-     * @param  list<int>  $indexes
+     * @param  list<int>  $indexes  words with kanji
+     * @param  list<int>  $loanwords  katakana words
      * @param  list<array<string, mixed>>  $words
-     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * @param  Collection<string, DictKanji>  $dictKanji
+     * @param  array<string, ?Wanted>  $wanted
      * @return array<int, string> item key per word index
      */
-    private function vocab(array $indexes, array $words, array &$wanted): array
+    private function vocab(array $indexes, array $loanwords, array $words, Collection $dictKanji, array &$wanted): array
     {
-        $spellings = array_merge(...array_map(fn ($i) => array_filter([$words[$i]['surface'], $words[$i]['lemma'] ?? null]), $indexes));
+        $spellings = array_merge(array_map(fn ($i) => $words[$i]['surface'], $loanwords), ...array_map(fn ($i) => array_filter([$words[$i]['surface'], $words[$i]['lemma'] ?? null]), $indexes));
         $dictionary = DictWord::query()->whereIn('spelling', $spellings)->where('is_name', false)->orderBy('id')->get()->groupBy('spelling');
 
         $items = [];
+        foreach ($loanwords as $i) {
+            $rows = $dictionary[$words[$i]['surface']] ?? null;
+            if ($rows !== null) {
+                $meanings = array_slice(array_values(array_unique(array_merge(...$rows->flatMap(fn (DictWord $w) => $w->glosses)->all()))), 0, 5);
+                $items[$i] = self::want($wanted, 'vocab', $words[$i]['surface'], [Kana::toHiragana($words[$i]['reading'])], $meanings, ItemLevel::vocab($rows->contains('common', true), []));
+            }
+        }
         foreach ($indexes as $i) {
             $word = $words[$i];
             foreach ([[$word['surface'], $word['reading']], [$word['lemma'] ?? null, $word['lemma_reading'] ?? null]] as [$spelling, $reading]) {
@@ -195,7 +219,8 @@ class Decomposer
                 if ($match !== null) {
                     $readings = array_values(array_unique($rows->map(fn (DictWord $w) => Kana::toHiragana($w->reading))->all()));
                     $meanings = array_slice(array_values(array_unique(array_merge(...$match->glosses))), 0, 5);
-                    $items[$i] = self::want($wanted, 'vocab', $spelling, $readings, $meanings);
+                    $kanji = array_map(fn (string $char) => self::kanjiLevel($dictKanji[$char] ?? null), Kana::kanjiIn($spelling));
+                    $items[$i] = self::want($wanted, 'vocab', $spelling, $readings, $meanings, ItemLevel::vocab($rows->contains('common', true), $kanji));
 
                     break;
                 }
@@ -224,15 +249,25 @@ class Decomposer
         return array_values(array_unique(array_filter(array_map('trim', $stripped), fn (string $m) => preg_match('/^\d*$/', $m) !== 1)));
     }
 
+    /** @return array{int, bool} */
+    private static function kanjiLevel(?DictKanji $kanji): array
+    {
+        return ItemLevel::kanji($kanji?->jlpt, $kanji?->grade);
+    }
+
     /**
-     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * The first readings and meanings for a key win; the level is the latest (a radical's
+     * level drops with each lower-level kanji).
+     *
+     * @param  array<string, ?Wanted>  $wanted
      * @param  list<string>  $readings
      * @param  list<string>  $meanings
+     * @param  array{int, bool}  $level
      */
-    private static function want(array &$wanted, string $kind, string $characters, array $readings, array $meanings): string
+    private static function want(array &$wanted, string $kind, string $characters, array $readings, array $meanings, array $level): string
     {
         $key = "{$kind}|{$characters}";
-        $wanted[$key] ??= ['readings' => $readings, 'meanings' => $meanings];
+        $wanted[$key] = [...$wanted[$key] ?? ['readings' => $readings, 'meanings' => $meanings], 'level' => $level[0], 'is_special' => $level[1]];
 
         return $key;
     }

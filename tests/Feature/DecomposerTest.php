@@ -21,6 +21,14 @@ class DecomposerTest extends TestCase
         $this->seedDictionary();
     }
 
+    /** @return array{int, bool} */
+    private function level(string $kind, string $characters): array
+    {
+        $item = $this->item($kind, $characters);
+
+        return [$item->level, $item->is_special];
+    }
+
     private function item(string $kind, string $characters): Item
     {
         return Item::query()->where(['kind' => $kind, 'characters' => $characters])->sole();
@@ -233,19 +241,96 @@ class DecomposerTest extends TestCase
 
     public function test_decompose_query_count_is_constant(): void
     {
-        $reference = $this->annotated('song', '今日は花に亡霊を宇宙で歌った', 'きょうわはなにぼうれいおうちゅうでうたった', [
+        $reference = $this->annotated('song', '今日は花に亡霊を宇宙で歌ったアイドル', 'きょうわはなにぼうれいおうちゅうでうたったあいどる', [
             ['今日', 'きょう'], ['は', 'わ'], ['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい'], ['を', 'お'],
-            ['宇宙', 'うちゅう'], ['で', 'で'], ['歌った', 'うたった', '歌う', 'うたう'],
+            ['宇宙', 'うちゅう'], ['で', 'で'], ['歌った', 'うたった', '歌う', 'うたう'], ['アイドル', 'あいどる'],
         ]);
         app(Verifier::class)->verify($reference);
         $reference = Reference::query()->with('annotation')->findOrFail($reference->id);
+        Item::query()->create(['kind' => 'radical', 'characters' => '一', 'readings' => [], 'meanings' => ['custom'], 'level' => 40, 'is_special' => true]);
 
         DB::enableQueryLog();
         app(Decomposer::class)->decompose($reference);
 
-        // detach, 2× dict_kanji, dict_words, find items, insert missing, find new, insert links
+        // detach, 2× dict_kanji, dict_words, find items, upsert missing and lowered, find again, insert links
         $this->assertLessThanOrEqual(8, count(DB::getQueryLog()));
         $this->assertCount(8, $this->links($reference->refresh(), 'kanji'));
+        $this->assertSame(['vocab:アイドル@14=あいどる'], array_values(array_filter($this->links($reference, 'vocab'), fn ($l) => str_contains($l, 'アイドル'))));
+        $this->assertSame([10, false, ['custom']], $this->level('radical', '一') + [2 => $this->item('radical', '一')->meanings]);
+    }
+
+    public function test_song_katakana_dictionary_word_becomes_loanword_vocab(): void
+    {
+        $reference = $this->annotated('song', 'アイドルとミーム', 'あいどるとみーむ', [['アイドル', 'あいどる'], ['と', 'と'], ['ミーム', 'みーむ']]);
+
+        $this->verify($reference);
+
+        $this->assertSame('verified', $reference->status);
+        $this->assertSame(['vocab:アイドル@0=あいどる', 'vocab:ミーム@5=みーむ'], $this->links($reference, 'vocab'));
+        $idol = $this->item('vocab', 'アイドル');
+        $this->assertSame(['あいどる'], $idol->readings);
+        $this->assertSame(['performer with a cultivated image', 'Japanese idol', 'idol', 'object of worship', 'icon'], $idol->meanings);
+        $this->assertSame([2, false], $this->level('vocab', 'アイドル'));
+        $this->assertSame([2, true], $this->level('vocab', 'ミーム')); // not common
+        $this->assertSame(['meme'], $this->item('vocab', 'ミーム')->meanings);
+        $this->assertContains('katakana:ア@0', $this->links($reference, 'katakana'));
+    }
+
+    public function test_kana_words_outside_the_rule_create_no_vocab(): void
+    {
+        $coined = $this->annotated('song', 'ギラギラファンミーティング', 'ぎらぎらふぁんみーてぃんぐ', [['ギラギラファンミーティング', 'ぎらぎらふぁんみーてぃんぐ']]);
+        $hiragana = $this->annotated('song', 'いや', 'いや', [['いや', 'いや']]);
+        $name = $this->annotated('name', 'アイドル', 'あいどる', [['アイドル', 'あいどる']], 'Aidoru', 'romaji');
+
+        foreach ([$coined, $hiragana, $name] as $reference) {
+            $this->verify($reference);
+            $this->assertSame('verified', $reference->status);
+            $this->assertSame([], $this->links($reference, 'vocab'));
+        }
+        $this->assertSame(0, Item::query()->where('kind', 'vocab')->count());
+    }
+
+    public function test_items_get_levels_and_special_flags(): void
+    {
+        $this->verify($this->annotated('song', '花に亡霊', 'はなにぼうれい', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']]));
+        $this->verify($this->annotated('song', '海賊団と湊と綺麗', 'かいぞくだんとみなとときれい', [['海賊団', 'かいぞくだん'], ['と', 'と'], ['湊', 'みなと'], ['と', 'と'], ['綺麗', 'きれい']]));
+
+        $this->assertSame([10, false], $this->level('kanji', '花')); // old JLPT 4
+        $this->assertSame([12, false], $this->level('kanji', '亡'));
+        $this->assertSame([13, false], $this->level('kanji', '霊'));
+        $this->assertSame([40, true], $this->level('kanji', '湊')); // name kanji, grade 9
+        $this->assertSame([10, false], $this->level('vocab', '花'));
+        $this->assertSame([13, false], $this->level('vocab', '亡霊')); // highest kanji
+        $this->assertSame([13, true], $this->level('vocab', '海賊団')); // not common
+        $this->assertSame([40, true], $this->level('vocab', '湊'));
+        $this->assertSame([10, false], $this->level('radical', '艹')); // from 花
+        $this->assertSame([11, false], $this->level('radical', '氵')); // 海 (11) beats 湊 (40)
+        $this->assertSame([40, true], $this->level('radical', '二')); // only in 湊
+        $this->assertSame([0, false], $this->level('hiragana', 'に'));
+    }
+
+    public function test_unknown_kanji_make_vocab_special(): void
+    {
+        $reference = $this->annotated('song', '綺麗', 'きれい', [['綺麗', 'きれい']]);
+
+        $this->verify($reference);
+
+        $this->assertSame(['vocab:綺麗@0=きれい'], $this->links($reference, 'vocab'));
+        $this->assertSame([40, true], $this->level('vocab', '綺麗'));
+    }
+
+    public function test_later_lower_level_kanji_lowers_its_radicals(): void
+    {
+        $this->verify($this->annotated('name', '湊あくあ', 'みなとあくあ', [['湊', 'みなと'], ['あくあ', 'あくあ']], 'Minato Aqua', 'romaji'));
+        $this->verify($this->annotated('song', '亡霊', 'ぼうれい', [['亡霊', 'ぼうれい']]));
+        $this->assertSame([13, false], $this->level('radical', '一')); // 霊 (13) beats 湊 (40)
+        $this->assertSame([40, true], $this->level('radical', '氵'));
+
+        $this->verify($this->annotated('song', '今日の海賊団', 'きょうのかいぞくだん', [['今日', 'きょう'], ['の', 'の'], ['海賊団', 'かいぞくだん']]));
+
+        $this->assertSame([10, false], $this->level('radical', '一')); // 今 (10)
+        $this->assertSame([11, false], $this->level('radical', '氵')); // 海 (11), special cleared
+        $this->assertSame([40, true], $this->level('radical', '二'));
     }
 
     public function test_unknown_kanji_is_skipped(): void

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Learning\ItemLevel;
 use App\Models\Item;
 use Illuminate\Database\Seeder;
 
@@ -31,10 +32,10 @@ class KanaSeeder extends Seeder
         $rows = [];
         foreach (self::HIRAGANA as $kana => $romaji) {
             $readings = json_encode([$romaji]);
-            $rows[] = ['kind' => 'hiragana', 'characters' => $kana, 'readings' => $readings, 'meanings' => '[]'];
-            $rows[] = ['kind' => 'katakana', 'characters' => mb_convert_kana($kana, 'C'), 'readings' => $readings, 'meanings' => '[]'];
+            $rows[] = ['kind' => 'hiragana', 'characters' => $kana, 'readings' => $readings, 'meanings' => '[]', 'level' => ItemLevel::kana('hiragana')[0]];
+            $rows[] = ['kind' => 'katakana', 'characters' => mb_convert_kana($kana, 'C'), 'readings' => $readings, 'meanings' => '[]', 'level' => ItemLevel::kana('katakana')[0]];
         }
 
-        Item::upsert($rows, ['kind', 'characters'], ['readings', 'meanings']);
+        Item::upsert($rows, ['kind', 'characters'], ['readings', 'meanings', 'level']);
     }
 }

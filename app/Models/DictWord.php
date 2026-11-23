@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
  * @property string $reading
  * @property list<list<string>> $glosses English glosses per sense
  * @property bool $is_name
+ * @property bool $common the spelling (kana-only rows: the kana) is marked common in JMdict
  */
 class DictWord extends Model
 {
@@ -20,6 +21,7 @@ class DictWord extends Model
         return [
             'glosses' => 'array',
             'is_name' => 'boolean',
+            'common' => 'boolean',
         ];
     }
 }

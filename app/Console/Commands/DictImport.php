@@ -8,6 +8,7 @@ use Generator;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
+use RuntimeException;
 
 class DictImport extends Command
 {
@@ -32,6 +33,8 @@ class DictImport extends Command
 
     private const CHUNK = 1000;
 
+    private const KANJI_COLUMNS = ['readings', 'meanings', 'radicals', 'jlpt', 'grade', 'frequency'];
+
     public function handle(): int
     {
         $files = [];
@@ -45,16 +48,32 @@ class DictImport extends Command
             $files[$key] = $matches[0];
         }
 
-        DB::transaction(function () use ($files) {
-            // dict_words has no natural unique key (homographs share spelling+reading),
-            // so a re-import replaces all rows instead of upserting.
-            DictWord::query()->delete();
-            $this->info('Wörter: '.$this->importWords($files['jmdict'], false));
-            $this->info('Namen: '.$this->importWords($files['jmnedict'], true));
-            $this->info('Kanji: '.$this->importKanji($files['kanjidic'], $files['kradfile']));
-        });
+        try {
+            DB::transaction(function () use ($files) {
+                // dict_words has no natural unique key (homographs share spelling+reading),
+                // so a re-import replaces all rows instead of upserting.
+                DictWord::query()->delete();
+                $this->info('Wörter: '.self::nonZero($this->importWords($files['jmdict'], false), 'Wörter', $files['jmdict']));
+                $this->info('Namen: '.self::nonZero($this->importWords($files['jmnedict'], true), 'Namen', $files['jmnedict']));
+                $this->info('Kanji: '.self::nonZero($this->importKanji($files['kanjidic'], $files['kradfile']), 'Kanji', $files['kanjidic']));
+            });
+        } catch (RuntimeException $e) {
+            $this->error($e->getMessage());
+
+            return self::FAILURE;
+        }
 
         return self::SUCCESS;
+    }
+
+    /** Zero entries means a changed upstream format; throwing rolls back the import. */
+    private static function nonZero(int $count, string $what, string $path): int
+    {
+        if ($count === 0) {
+            throw new RuntimeException("Keine {$what} in ".basename($path).' gelesen – Format geändert? Import abgebrochen, bisherige Daten bleiben erhalten.');
+        }
+
+        return $count;
     }
 
     private function importWords(string $path, bool $isName): int
@@ -62,12 +81,13 @@ class DictImport extends Command
         $rows = [];
         $total = 0;
         foreach ($this->entries($path) as $n => $entry) {
-            foreach ($this->wordRows($entry) as [$spelling, $reading, $glosses]) {
+            foreach ($this->wordRows($entry) as [$spelling, $reading, $glosses, $common]) {
                 $rows[] = [
                     'spelling' => $spelling,
                     'reading' => $reading,
                     'glosses' => json_encode($glosses, JSON_UNESCAPED_UNICODE),
                     'is_name' => $isName,
+                    'common' => $common && ! $isName,
                 ];
             }
             if (count($rows) >= self::CHUNK) {
@@ -86,15 +106,17 @@ class DictImport extends Command
 
     /**
      * One row per valid (spelling, reading) pair, with the English glosses of the senses
-     * that apply to it. Kana-only words and readings, and readings of words marked
-     * "usually written in kana" (uk), also get the kana as spelling.
+     * that apply to it and whether the spelling form is marked common. Kana-only words and
+     * readings, and readings of words marked "usually written in kana" (uk), also get the
+     * kana as spelling (then the kana form's common flag counts).
      *
      * @param  array<string, mixed>  $entry
-     * @return list<array{string, string, list<list<string>>}>
+     * @return list<array{string, string, list<list<string>>, bool}>
      */
     private function wordRows(array $entry): array
     {
         $kanji = array_column($entry['kanji'] ?? [], 'text');
+        $commonKanji = array_column($entry['kanji'] ?? [], 'common', 'text');
         $senses = [];
         $usuallyKana = false;
         foreach ($entry['sense'] ?? $entry['translation'] ?? [] as $sense) {
@@ -134,7 +156,8 @@ class DictImport extends Command
                         $glosses[] = $senseGlosses;
                     }
                 }
-                $rows[] = [$spelling, $reading, $glosses];
+                $common = $spelling === $reading ? ($kana['common'] ?? false) : ($commonKanji[$spelling] ?? false);
+                $rows[] = [$spelling, $reading, $glosses, $common === true];
             }
         }
 
@@ -184,14 +207,17 @@ class DictImport extends Command
                 'readings' => json_encode(['on' => $on, 'kun' => $kun, 'nanori' => $character['readingMeaning']['nanori'] ?? [], 'plain' => $plain], JSON_UNESCAPED_UNICODE),
                 'meanings' => json_encode($meanings, JSON_UNESCAPED_UNICODE),
                 'radicals' => json_encode($radicals, JSON_UNESCAPED_UNICODE),
+                'jlpt' => $character['misc']['jlptLevel'] ?? null,
+                'grade' => $character['misc']['grade'] ?? null,
+                'frequency' => $character['misc']['frequency'] ?? null,
             ];
             if (count($rows) === self::CHUNK) {
-                DictKanji::upsert($rows, ['character'], ['readings', 'meanings', 'radicals']);
+                DictKanji::upsert($rows, ['character'], self::KANJI_COLUMNS);
                 $total += count($rows);
                 $rows = [];
             }
         }
-        DictKanji::upsert($rows, ['character'], ['readings', 'meanings', 'radicals']);
+        DictKanji::upsert($rows, ['character'], self::KANJI_COLUMNS);
 
         return $total + count($rows);
     }

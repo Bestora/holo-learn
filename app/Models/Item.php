@@ -12,8 +12,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
  * @property string $characters
  * @property list<string> $readings
  * @property list<string> $meanings
+ * @property int $level learned in ascending order, see App\Learning\ItemLevel
+ * @property bool $is_special optional bonus item
  */
-#[Fillable(['kind', 'characters', 'readings', 'meanings'])]
+#[Fillable(['kind', 'characters', 'readings', 'meanings', 'level', 'is_special'])]
 class Item extends Model
 {
     public $timestamps = false;
@@ -23,6 +25,7 @@ class Item extends Model
         return [
             'readings' => 'array',
             'meanings' => 'array',
+            'is_special' => 'boolean',
         ];
     }
 

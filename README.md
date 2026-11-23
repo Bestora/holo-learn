@@ -19,6 +19,10 @@ php artisan dict:import storage/app/dict
 
 Kana-Elemente: `php artisan db:seed --class=KanaSeeder`.
 
+Lernstufe und Spezial-Kennzeichen der Elemente (`items.level`, `items.is_special`) leiten
+sich aus JLPT-Stufe, Schulstufe und „häufig“-Markierung ab (`App\Learning\ItemLevel`).
+Nach einem neuen Wörterbuch-Import neu berechnen: `php artisan items:relevel`.
+
 ### Lizenz und Quellenangabe
 
 Diese Anwendung verwendet die Dateien [JMdict](https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project),
