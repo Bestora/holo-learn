@@ -20,8 +20,7 @@ class DashboardController extends Controller
             'stats' => [
                 // a missed day breaks the streak even before the next lesson resets it
                 'streak_days' => $user->last_lesson_on?->toDateString() >= $yesterday ? $user->streak_days : 0,
-                'due_count' => $user->reviews()->where('due_at', '<=', now())
-                    ->whereHas('item.references', fn ($q) => $q->where('status', 'verified'))->count(),
+                'due_count' => $user->reviews()->showable()->where('due_at', '<=', now())->count(),
                 'learned' => array_merge(array_fill_keys(NewItems::KINDS, 0), $learned),
                 'available' => $newItems->availableCounts(),
             ],

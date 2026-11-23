@@ -17,7 +17,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('learn/answer', [LearnController::class, 'answer'])->name('learn.answer');
     Route::post('learn/override', [LearnController::class, 'override'])->name('learn.override');
 
-    Route::post('occurrences/{occurrence}/dead', [OccurrenceController::class, 'dead'])->name('occurrences.dead');
+    Route::post('occurrences/{occurrence}/dead', [OccurrenceController::class, 'dead'])->middleware('throttle:30,1')->name('occurrences.dead');
 
     Route::get('favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     Route::put('favorites', [FavoriteController::class, 'update'])->name('favorites.update');

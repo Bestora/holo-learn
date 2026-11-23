@@ -63,17 +63,16 @@ class NextCard
             return [];
         }
 
-        return $user->reviews()->where('due_at', '<=', now())
-            ->whereHas('item.references', fn (Builder $q) => $q->where('status', 'verified'))
+        return $user->reviews()->showable()->where('due_at', '<=', now())
             ->whereNotIn('item_id', $except)
             ->when($only !== null, fn (Builder $q) => $q->whereIn('item_id', $only))
             ->with('item')->orderBy('due_at')->orderBy('id')->lazy(50);
     }
 
-    /** Earliest due date among reviews that can still be shown (ISO 8601), or null. */
+    /** Earliest future due date among reviews that can still be shown (ISO 8601), or null. Never in the past. */
     public function nextDueAt(User $user): ?string
     {
-        $next = $user->reviews()->whereHas('item.references', fn (Builder $q) => $q->where('status', 'verified'))->min('due_at');
+        $next = $user->reviews()->showable()->where('due_at', '>', now())->min('due_at');
 
         return $next === null ? null : CarbonImmutable::parse($next)->toIso8601String();
     }

@@ -34,6 +34,17 @@ class LearnTest extends TestCase
         return Item::query()->where('characters', $characters)->whereIn('kind', ['hiragana', 'katakana'])->sole();
     }
 
+    /** Keeps the seeded kana (all eligible) from filling the lesson with intros. */
+    private function noNewItems(): void
+    {
+        config(['hololearn.new_items_per_day' => 0]);
+    }
+
+    private function withoutKana(): void
+    {
+        Item::query()->whereIn('kind', ['hiragana', 'katakana'])->delete();
+    }
+
     /** @param array<string, mixed> $card */
     private function rightAnswer(array $card): string
     {
@@ -100,20 +111,6 @@ class LearnTest extends TestCase
         $this->assertSame([0], $props['card']['reference']['highlight']);
         $this->assertSame(['ni'], $props['card']['reveal']['item']['readings']);
         $this->assertNotNull($props['card']['reveal']['occurrence']['video_id']);
-    }
-
-    public function test_an_item_repeated_in_one_reference_counts_that_reference_once(): void
-    {
-        $ne = $this->kana('ね');
-        $this->makeRef([[$ne, 2], [$ne, 3]], text: '桃鈴ねね');
-        $this->withRefs($ne, 1);
-        $this->actingAs($this->learner());
-
-        $props = $this->learnProps();
-
-        $this->assertNull($props['card']);
-        $this->assertSame(['next_due_at' => null], $props['nothing_due']);
-        $this->assertSame(0, Lesson::query()->count()); // no empty lesson created
     }
 
     public function test_only_verified_references_ever_appear(): void
@@ -214,6 +211,7 @@ class LearnTest extends TestCase
 
     public function test_a_wrong_item_returns_after_two_other_cards_and_at_most_once(): void
     {
+        $this->noNewItems();
         $user = $this->learner();
         $items = collect(['あ', 'い', 'う', 'え'])->map(fn ($c) => $this->kana($c));
         foreach ($items as $i => $item) {
@@ -236,6 +234,7 @@ class LearnTest extends TestCase
 
     public function test_a_wrong_item_comes_back_early_when_nothing_else_is_left(): void
     {
+        $this->noNewItems();
         $user = $this->learner();
         $a = $this->kana('あ');
         $this->withRefs($a, 3);
@@ -274,6 +273,7 @@ class LearnTest extends TestCase
 
     public function test_never_the_same_reference_twice_in_a_row_across_twenty_reviews(): void
     {
+        config(['hololearn.new_items_per_day' => 1]); // only ね
         $ne = $this->kana('ね');
         $this->withRefs($ne, 5);
         $this->actingAs($this->learner());
@@ -283,6 +283,7 @@ class LearnTest extends TestCase
             $card = $this->nextCard();
             if ($card['type'] === 'intro') {
                 $this->confirmIntro($ne->id);
+                $this->noNewItems(); // only ね, also on later days
                 $previous = $card['reference']['id'];
                 $card = $this->nextCard();
             }
@@ -324,11 +325,12 @@ class LearnTest extends TestCase
 
     public function test_reviewed_items_without_verified_references_are_skipped(): void
     {
+        $this->noNewItems();
         $user = $this->learner();
-        $a = $this->kana('あ');
-        $i = $this->kana('い');
-        $aRefs = $this->withRefs($a, 3);
-        $this->withRefs($i, 3);
+        $a = $this->makeItem('kanji', '花', ['はな'], ['flower'], 10); // kana are never skipped: they show alone
+        $i = $this->makeItem('kanji', '海', ['うみ'], ['sea'], 10);
+        $aRefs = $this->withRefs($a, 3, context: 'はな');
+        $this->withRefs($i, 3, context: 'うみ');
         $this->review($user, $a, 2, now()->subDays(2));
         $this->review($user, $i, 2, now()->subDay());
         Reference::query()->whereIn('id', $aRefs->pluck('id'))->update(['status' => 'rejected']);
@@ -371,6 +373,7 @@ class LearnTest extends TestCase
 
     public function test_nothing_due_reports_the_next_review(): void
     {
+        $this->noNewItems();
         $user = $this->learner();
         $a = $this->kana('あ');
         $this->withRefs($a, 3);
@@ -386,6 +389,7 @@ class LearnTest extends TestCase
 
     public function test_radicals_without_meanings_are_never_offered(): void
     {
+        $this->withoutKana();
         $empty = $this->makeItem('radical', '乙', [], [], 0);
         $this->withRefs($empty, 5);
         $this->actingAs($this->learner());
@@ -543,6 +547,120 @@ class LearnTest extends TestCase
         $this->assertSame(1, Lesson::query()->whereNull('finished_at')->count());
     }
 
+    public function test_a_kana_without_references_is_taught_as_the_character_alone(): void
+    {
+        config(['hololearn.new_items_per_day' => 1]);
+        $a = $this->kana('あ'); // first in gojūon order
+        $user = $this->learner();
+        $this->actingAs($user);
+
+        $intro = $this->learnProps()['card'];
+        $this->assertSame(['intro', $a->id, null, null, 0], [$intro['type'], $intro['item']['id'], $intro['reference'], $intro['talent'], $intro['remaining_references']]);
+        $this->assertSame(['あ', 'a', [], null, null], [$intro['reveal']['reading'], $intro['reveal']['romaji'], $intro['reveal']['words'], $intro['reveal']['occurrence'], $intro['reveal']['alt_text']]);
+        $this->confirmIntro($a->id);
+
+        $quiz = $this->learnProps()['card'];
+        $this->assertSame(['quiz', 'choice', null, null], [$quiz['type'], $quiz['mode'], $quiz['reference'], $quiz['talent']]);
+        $this->assertContains('a', $quiz['options']);
+        $result = $this->answer($a->id, 'a');
+        $this->assertTrue($result['correct']);
+        $this->assertNull($result['reveal']['occurrence']);
+        $this->assertNull(Review::query()->sole()->last_reference_id);
+
+        Review::query()->update(['stage' => 2, 'due_at' => now()->subMinute()]);
+        $typed = $this->nextCard();
+        $this->assertSame(['typed', null], [$typed['mode'], $typed['reference']]);
+        $this->assertFalse($this->answer($a->id, 'i')['correct']);
+    }
+
+    public function test_reveal_lists_the_display_meaning_first_and_romaji_per_word(): void
+    {
+        config(['hololearn.new_items_per_day' => 0]);
+        $user = $this->learner();
+        $star = $this->makeItem('kanji', '星', ['ほし'], ['spot', 'star'], 10);
+        $star->update(['meanings' => ['(celestial) star', 'spot', 'dot']]);
+        $this->makeRef([[$star, 0, 'ほしまち']], kind: 'name', text: '星街すいせい', words: [['星街', 'ほしまち', 0], ['すいせい', 'すいせい', 1]]);
+        $this->review($user, $star, 3);
+        $this->actingAs($user);
+
+        $this->learnProps();
+        $reveal = $this->answer($star->id, 'star')['reveal'];
+
+        $this->assertSame(['star', 'spot', 'dot'], $reveal['item']['meanings']); // '(celestial) star' shown as 'star'
+        $this->assertSame('hoshimachi suisei', $reveal['romaji']);
+        $this->assertSame(['hoshimachi', 'suisei'], array_column($reveal['words'], 'romaji'));
+    }
+
+    public function test_a_typo_that_spells_another_items_meaning_is_wrong(): void
+    {
+        config(['hololearn.new_items_per_day' => 0]);
+        $user = $this->learner();
+        $horse = $this->makeItem('kanji', '馬', ['うま'], ['horse'], 10);
+        $this->withRefs($horse, 2, context: 'うま');
+        $this->makeItem('kanji', '家', ['いえ'], ['house'], 10);
+        $this->review($user, $horse, 3);
+        $this->actingAs($user);
+
+        $this->learnProps();
+        $this->assertFalse($this->answer($horse->id, 'house')['correct']);
+
+        Lesson::query()->delete();
+        Review::query()->update(['stage' => 3, 'due_at' => now()->subMinute()]);
+        $this->learnProps();
+        $this->assertTrue($this->answer($horse->id, 'hors')['correct']);
+    }
+
+    public function test_nothing_due_tells_when_new_items_return(): void
+    {
+        config(['hololearn.new_items_per_day' => 1]);
+        $this->travelTo(CarbonImmutable::parse('2026-11-23 15:00', 'UTC'));
+        $user = $this->learner();
+        $this->actingAs($user);
+
+        $this->confirmIntro($this->learnProps()['card']['item']['id']);
+        $card = $this->learnProps()['card'];
+        $this->answer($card['item']['id'], $this->rightAnswer($card));
+        $this->post(route('learn.start')); // nothing to dismiss yet: lesson still open
+        $this->assertNotNull($this->learnProps()['summary']);
+        $this->post(route('learn.start'));
+
+        $this->assertSame([
+            'next_due_at' => now()->addHours(4)->toIso8601String(),
+            'new_items_at' => '2026-11-23T23:00:00+00:00', // midnight in Berlin
+        ], $this->learnProps()['nothing_due']);
+    }
+
+    public function test_next_due_at_is_never_in_the_past(): void
+    {
+        config(['hololearn.new_items_per_day' => 0]);
+        $user = $this->learner();
+        $radical = $this->makeItem('radical', '艹', [], ['grass'], 10);
+        $this->withRefs($radical, 3);
+        $this->review($user, $radical, 0, now()->subDay()); // no distractors: cannot become a card
+        $later = $this->kana('ね');
+        $this->review($user, $later, 3, now()->addHours(3));
+        $this->actingAs($user);
+
+        $this->assertSame(now()->addHours(3)->toIso8601String(), $this->learnProps()['nothing_due']['next_due_at']);
+    }
+
+    public function test_dismissing_the_summary_closes_the_override_window(): void
+    {
+        config(['hololearn.lesson_size' => 1, 'hololearn.new_items_per_day' => 0]);
+        $user = $this->learner();
+        $kanji = $this->makeItem('kanji', '花', ['はな'], ['flower'], 10);
+        $this->withRefs($kanji, 3, context: 'はな');
+        $this->review($user, $kanji, 3);
+        $this->actingAs($user);
+
+        $this->learnProps();
+        $this->assertTrue($this->answer($kanji->id, 'xq')['can_override']);
+        $this->post(route('learn.start'));
+
+        $this->postJson(route('learn.override'))->assertStatus(422);
+        $this->assertNull(Lesson::query()->sole()->state['last_answer']);
+    }
+
     public function test_choice_falls_back_to_typed_without_enough_distractors(): void
     {
         $user = $this->learner();
@@ -559,6 +677,7 @@ class LearnTest extends TestCase
 
     public function test_a_radical_without_distractors_is_skipped(): void
     {
+        $this->withoutKana();
         $user = $this->learner();
         $radical = $this->makeItem('radical', '艹', [], ['grass'], 10);
         $this->withRefs($radical, 3);
@@ -570,6 +689,7 @@ class LearnTest extends TestCase
 
     public function test_override_regrades_a_wrong_typed_meaning(): void
     {
+        $this->noNewItems();
         $user = $this->learner();
         $kanji = $this->makeItem('kanji', '花', ['はな'], ['flower'], 10);
         $this->withRefs($kanji, 3, context: 'はな');

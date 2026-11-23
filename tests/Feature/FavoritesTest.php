@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Item;
 use App\Models\Occurrence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Log;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
 
@@ -84,6 +85,21 @@ class FavoritesTest extends TestCase
         $this->put(route('specials.update'), ['enabled' => true])->assertRedirect();
         $this->assertTrue($user->fresh()->specials_enabled);
         $this->putJson(route('specials.update'), ['enabled' => 'vielleicht'])->assertStatus(422);
+    }
+
+    public function test_marking_occurrences_dead_is_throttled_and_logged(): void
+    {
+        Log::spy();
+        $occurrence = $this->makeRef([[$this->makeItem('hiragana', 'ね', ['ne']), 0]])->occurrences()->sole();
+        $user = $this->learner();
+        $this->actingAs($user);
+
+        for ($i = 0; $i < 30; $i++) {
+            $this->post(route('occurrences.dead', $occurrence))->assertNoContent();
+        }
+        $this->post(route('occurrences.dead', $occurrence))->assertTooManyRequests();
+
+        Log::shouldHaveReceived('info')->with('occurrence marked dead', ['occurrence_id' => $occurrence->id, 'user_id' => $user->id])->atLeast()->once();
     }
 
     public function test_marking_an_occurrence_dead_is_idempotent(): void

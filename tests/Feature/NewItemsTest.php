@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Learning\NewItems;
+use App\Models\DictKanji;
 use App\Models\Item;
 use App\Models\User;
 use Carbon\CarbonImmutable;
+use Database\Seeders\KanaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -84,22 +86,78 @@ class NewItemsTest extends TestCase
         $this->assertSame(['N3', 'N4'], $this->walk($user, 5));
     }
 
-    public function test_order_and_eligibility(): void
+    public function test_order_and_eligibility_with_per_kind_thresholds(): void
     {
-        $this->withRefs($this->makeItem('kanji', 'B', ['b'], ['b'], 10), 3);
-        $this->withRefs($this->makeItem('kanji', 'A', ['a'], ['a'], 10), 4); // more references first
-        $this->withRefs($this->makeItem('kanji', 'C', ['c'], ['c'], 3), 3);  // lower level first
+        $this->makeItem('hiragana', 'あ', ['a']);                                  // kana: always eligible
+        $this->withRefs($this->makeItem('kanji', 'B', ['b'], ['b'], 10), 2);      // kanji: 2 references
+        $this->withRefs($this->makeItem('kanji', 'A', ['a'], ['a'], 10), 3);      // more references first
+        $this->withRefs($this->makeItem('kanji', 'C', ['c'], ['c'], 3), 2);       // lower level first
         $few = $this->makeItem('kanji', 'D', ['d'], ['d'], 1);
-        $this->withRefs($few, 2);
+        $this->withRefs($few, 1);                                                 // 1 verified: too few
         $this->withRefs($few, 5, 'rejected');
-        $this->withRefs($this->makeItem('radical', 'R', [], [], 0), 5);    // radical without meanings
-        $this->withRefs($this->makeItem('radical', 'Q', [], ['q'], 11), 3);
+        $twice = $this->makeItem('kanji', 'E', ['e'], ['e'], 1);
+        $this->makeRef([[$twice, 0], [$twice, 1]]);                               // one reference, linked twice
+        $this->withRefs($this->makeItem('vocab', 'V', ['v'], ['v'], 11), 1);      // vocab: 1 reference
+        $this->withRefs($this->makeItem('radical', 'R', [], [], 0), 5);          // radical without meanings
+        $this->withRefs($this->makeItem('radical', 'Q', [], ['q'], 11), 1);
 
-        $this->assertSame(['C', 'A', 'B', 'Q'], $this->newItems()->eligible()->pluck('characters')->all());
-        $this->assertSame(['hiragana' => 0, 'katakana' => 0, 'radical' => 1, 'kanji' => 3, 'vocab' => 0], $this->newItems()->availableCounts());
+        $this->assertSame(['あ', 'C', 'A', 'B', 'V', 'Q'], $this->newItems()->eligible()->pluck('characters')->all());
+        $this->assertSame(['hiragana' => 1, 'katakana' => 0, 'radical' => 1, 'kanji' => 3, 'vocab' => 1], $this->newItems()->availableCounts());
 
         $user = $this->learner();
+        $this->review($user, Item::query()->where('characters', 'あ')->sole());
         $this->review($user, Item::query()->where('characters', 'C')->sole());
         $this->assertSame('A', $this->newItems()->next($user)?->characters);
+        $this->assertSame(['A', 'B', 'V'], $this->newItems()->eligible($user)->pluck('characters')->all()); // Q: no kanji of it reviewed
+    }
+
+    public function test_every_kana_is_taught_those_with_references_first(): void
+    {
+        $this->seed(KanaSeeder::class);
+        $hiragana = fn (string $c) => Item::query()->where(['kind' => 'hiragana', 'characters' => $c])->sole();
+        $this->withRefs($hiragana('ね'), 3);
+        $this->withRefs($hiragana('に'), 4);
+
+        $eligible = $this->newItems()->eligible($this->learner());
+
+        $this->assertSame(142, $eligible->count());
+        $this->assertSame(['に', 'ね', 'あ', 'い', 'う'], $eligible->take(5)->pluck('characters')->all());
+        $this->assertSame(array_fill(0, 71, 'hiragana'), $eligible->take(71)->pluck('kind')->all());
+    }
+
+    private function kanjiWithRadicals(string $kanji, array $radicals): Item
+    {
+        DictKanji::query()->forceCreate(['character' => $kanji, 'readings' => ['on' => [], 'kun' => [], 'nanori' => [], 'plain' => []], 'meanings' => ['m'], 'radicals' => $radicals]);
+        $item = $this->makeItem('kanji', $kanji, ['よ'], ["m{$kanji}"], 10);
+        $this->withRefs($item, 2);
+
+        return $item;
+    }
+
+    public function test_radicals_follow_their_kanji(): void
+    {
+        config(['hololearn.new_items_per_day' => 100]);
+        foreach (['亻' => 'person', '匕' => 'spoon', '艹' => 'grass'] as $radical => $meaning) {
+            $this->withRefs($this->makeItem('radical', $radical, [], [$meaning], 10), 3);
+        }
+        $this->kanjiWithRadicals('花', ['亻', '匕', '艹']);
+        $user = $this->learner();
+
+        $this->assertSame(['花'], $this->newItems()->eligible($user)->pluck('characters')->all()); // no radical before its kanji
+        $this->assertSame(['花', '亻', '匕', '艹'], $this->walk($user, 10)); // then they come
+    }
+
+    public function test_never_two_radicals_within_three_new_items_while_others_exist(): void
+    {
+        config(['hololearn.new_items_per_day' => 100]);
+        foreach (['亻' => 'person', '匕' => 'spoon', '艹' => 'grass'] as $radical => $meaning) {
+            $this->withRefs($this->makeItem('radical', $radical, [], [$meaning], 10), 3); // more references: sorted first
+        }
+        $this->kanjiWithRadicals('花', ['亻', '匕', '艹']);
+        foreach (['海', '空', '星', '月'] as $kanji) {
+            $this->kanjiWithRadicals($kanji, []);
+        }
+
+        $this->assertSame(['花', '海', '亻', '空', '星', '匕', '月', '艹'], $this->walk($this->learner(), 10));
     }
 }

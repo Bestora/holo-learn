@@ -25,7 +25,7 @@ class LessonFlow
 {
     private const EMPTY_STATE = ['pending' => null, 'used_references' => [], 'answers' => [], 'last_answer' => null, 'dismissed' => false];
 
-    public function __construct(private NextCard $next, private Cards $cards) {}
+    public function __construct(private NextCard $next, private Cards $cards, private NewItems $newItems) {}
 
     /**
      * Props for GET /learn: {lesson, card, summary, nothing_due}.
@@ -48,7 +48,9 @@ class LessonFlow
             }
             if ($state['pending'] === null && ($pending = $this->next->issue($user, $state, $lesson->position ?? 0))) {
                 $state['pending'] = $pending;
-                $state['used_references'][] = $pending['reference_id'];
+                if ($pending['reference_id'] !== null) {
+                    $state['used_references'][] = $pending['reference_id'];
+                }
                 $state['last_answer'] = null;
             }
 
@@ -61,7 +63,10 @@ class LessonFlow
                 }
                 $lesson?->delete();
 
-                return ['lesson' => null, 'card' => null, 'summary' => null, 'nothing_due' => ['next_due_at' => $this->next->nextDueAt($user)]];
+                return ['lesson' => null, 'card' => null, 'summary' => null, 'nothing_due' => [
+                    'next_due_at' => $this->next->nextDueAt($user),
+                    'new_items_at' => $this->newItems->newItemsAt($user), // set when only the daily limit holds new items back
+                ]];
             }
 
             $lesson ??= new Lesson(['user_id' => $user->id, 'size' => (int) config('hololearn.lesson_size')]);
@@ -105,7 +110,7 @@ class LessonFlow
 
             $correct = match (true) {
                 $pending['mode'] === 'choice' => $answer === $pending['correct_option'],
-                $pending['field'] === 'meaning' => AnswerChecker::meaning($answer, $pending['expected']),
+                $pending['field'] === 'meaning' => AnswerChecker::meaning($answer, $pending['expected'], $this->cards->otherMeanings($itemId)),
                 default => AnswerChecker::reading($answer, $pending['expected']),
             };
             $now = now()->toImmutable();
@@ -173,7 +178,7 @@ class LessonFlow
         DB::transaction(function () use ($user) {
             $lesson = $this->lockUser($user)->lessons()->latest('id')->lockForUpdate()->first();
             if ($lesson?->finished_at !== null) {
-                $lesson->state = ['dismissed' => true] + $lesson->state;
+                $lesson->state = ['dismissed' => true, 'last_answer' => null] + $lesson->state; // closes the override window
                 $lesson->save();
             }
         });

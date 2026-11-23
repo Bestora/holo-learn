@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -24,6 +25,17 @@ class Review extends Model
     protected function casts(): array
     {
         return ['stage' => 'integer', 'due_at' => 'datetime'];
+    }
+
+    /**
+     * Reviews whose item can still be shown: kana always, others with a verified reference.
+     *
+     * @param  Builder<Review>  $query
+     */
+    public function scopeShowable(Builder $query): void
+    {
+        $query->whereHas('item', fn (Builder $item) => $item->whereIn('kind', ['hiragana', 'katakana'])
+            ->orWhereHas('references', fn (Builder $q) => $q->where('status', 'verified')));
     }
 
     /** @return BelongsTo<Item, $this> */

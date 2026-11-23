@@ -23,13 +23,14 @@ class Cards
      */
     public function intro(User $user, Item $item, array $usedReferences): ?array
     {
-        $pick = $this->picker->pick($user, $item, null, $usedReferences);
+        $pick = $this->pick($user, $item, null, $usedReferences);
 
-        return $pick === null ? null : $this->pending('intro', $item, null, $pick, Question::field($item, 0), 'choice', null, null, []);
+        return $pick === false ? null : $this->pending('intro', $item, null, $pick, Question::field($item, 0), 'choice', null, null, []);
     }
 
     /**
-     * Null when the item has no verified reference any more, or is a radical without enough distractors.
+     * Null when the item (not a kana) has no verified reference any more, or is a radical without
+     * enough distractors.
      *
      * @param  list<int>  $usedReferences
      * @return ?array<string, mixed> pending card
@@ -37,14 +38,14 @@ class Cards
     public function quiz(User $user, Review $review, array $usedReferences): ?array
     {
         $item = $review->item;
-        $pick = $this->picker->pick($user, $item, $review->last_reference_id, $usedReferences);
-        if ($pick === null) {
+        $pick = $this->pick($user, $item, $review->last_reference_id, $usedReferences);
+        if ($pick === false) {
             return null;
         }
 
         $field = Question::field($item, $review->stage);
         $mode = Question::mode($item, $review->stage);
-        $expected = Question::expected($item, $field, $this->picker->links($item, $pick['reference']->id)['context_readings']);
+        $expected = Question::expected($item, $field, $pick === null ? [] : $this->picker->links($item, $pick['reference']->id)['context_readings']);
         $correct = Question::correctOption($item, $field, $expected);
         $options = $mode === 'choice' ? $this->choices->options($item, $field, $correct, $expected) : null;
         if ($mode === 'choice' && $options === null) {
@@ -58,15 +59,19 @@ class Cards
     }
 
     /**
-     * Whether a stored pending card may still be shown (its reference is still verified and linked).
+     * Whether a stored pending card may still be shown (its reference is still verified and linked;
+     * a kana card without reference always).
      *
      * @param  array<string, mixed>  $pending
      */
     public function isValid(array $pending): bool
     {
         $item = Item::query()->whereKey($pending['item_id'])->first();
+        if ($item === null) {
+            return false;
+        }
 
-        return $item !== null && $this->picker->isShowable($item, $pending['reference_id']);
+        return $pending['reference_id'] === null ? Question::isKana($item) : $this->picker->isShowable($item, $pending['reference_id']);
     }
 
     /**
@@ -76,14 +81,15 @@ class Cards
     public function props(array $pending): array
     {
         [$item, $reference, $occurrence] = $this->load($pending);
-        $links = $this->picker->links($item, $reference->id);
+        $links = $reference === null ? ['positions' => [], 'context_readings' => []] : $this->picker->links($item, $reference->id);
         $quiz = $pending['type'] === 'quiz';
         $talent = $occurrence?->talent;
 
         $card = [
             'type' => $pending['type'],
             'item' => ['id' => $item->id, 'kind' => $item->kind, 'characters' => $item->characters, 'is_special' => $item->is_special],
-            'reference' => [
+            // null: a kana without verified references, shown alone
+            'reference' => $reference === null ? null : [
                 'id' => $reference->id, 'kind' => $reference->kind, 'text_ja' => $reference->text_ja,
                 'highlight' => $links['positions'], 'word' => $this->word($item, $reference, $pending['field'], $links['positions']),
             ],
@@ -96,8 +102,8 @@ class Cards
             'field' => $pending['field'],
             'mode' => $pending['mode'],
             'options' => $pending['options'],
-            'remaining_references' => $this->picker->remaining($item, $reference->id),
-            'is_name_reading' => $reference->kind === 'name' && $pending['field'] === 'reading' && $item->kind === 'kanji',
+            'remaining_references' => $reference === null ? 0 : $this->picker->remaining($item, $reference->id),
+            'is_name_reading' => $reference?->kind === 'name' && $pending['field'] === 'reading' && $item->kind === 'kanji',
         ];
         if (! $quiz) {
             $card['reveal'] = Reveal::build($item, $reference, $occurrence, $links['context_readings'][0] ?? null);
@@ -114,7 +120,19 @@ class Cards
     {
         [$item, $reference, $occurrence] = $this->load($pending);
 
-        return Reveal::build($item, $reference, $occurrence, $this->picker->links($item, $reference->id)['context_readings'][0] ?? null);
+        return Reveal::build($item, $reference, $occurrence, $reference === null ? null : ($this->picker->links($item, $reference->id)['context_readings'][0] ?? null));
+    }
+
+    /**
+     * Normalised meanings of every other item, so a typo match that is another real word counts wrong.
+     *
+     * @return array<string, true>
+     */
+    public function otherMeanings(int $itemId): array
+    {
+        $meanings = Item::query()->whereKeyNot($itemId)->whereNotIn('kind', ['hiragana', 'katakana'])->pluck('meanings')->flatten()->all();
+
+        return array_fill_keys(array_map(fn (string $m) => AnswerChecker::normalizeMeaning($m), $meanings), true);
     }
 
     /**
@@ -148,31 +166,42 @@ class Cards
 
     /**
      * @param  array<string, mixed>  $pending
-     * @return array{Item, Reference, ?Occurrence}
+     * @return array{Item, ?Reference, ?Occurrence}
      */
     private function load(array $pending): array
     {
         return [
             Item::query()->whereKey($pending['item_id'])->firstOrFail(),
-            Reference::query()->with('annotation')->whereKey($pending['reference_id'])->firstOrFail(),
+            $pending['reference_id'] === null ? null : Reference::query()->with('annotation')->whereKey($pending['reference_id'])->firstOrFail(),
             $pending['occurrence_id'] === null ? null : Occurrence::query()->with('talent')->whereKey($pending['occurrence_id'])->first(),
         ];
     }
 
     /**
-     * @param  array{reference: Reference, occurrence: ?Occurrence}  $pick
+     * The picked reference; null for a kana without verified references (shown alone); false: no card.
+     *
+     * @param  list<int>  $usedReferences
+     * @return array{reference: Reference, occurrence: ?Occurrence}|null|false
+     */
+    private function pick(User $user, Item $item, ?int $lastReferenceId, array $usedReferences): array|null|false
+    {
+        return $this->picker->pick($user, $item, $lastReferenceId, $usedReferences) ?? (Question::isKana($item) ? null : false);
+    }
+
+    /**
+     * @param  ?array{reference: Reference, occurrence: ?Occurrence}  $pick
      * @param  ?list<string>  $options
      * @param  list<string>  $expected
      * @return array<string, mixed>
      */
-    private function pending(string $type, Item $item, ?Review $review, array $pick, string $field, string $mode, ?array $options, ?string $correct, array $expected): array
+    private function pending(string $type, Item $item, ?Review $review, ?array $pick, string $field, string $mode, ?array $options, ?string $correct, array $expected): array
     {
         return [
             'type' => $type,
             'item_id' => $item->id,
             'review_id' => $review?->id,
-            'reference_id' => $pick['reference']->id,
-            'occurrence_id' => $pick['occurrence']?->id,
+            'reference_id' => $pick === null ? null : $pick['reference']->id,
+            'occurrence_id' => $pick === null ? null : $pick['occurrence']?->id,
             'field' => $field,
             'mode' => $mode,
             'options' => $options,

@@ -94,7 +94,8 @@ return [
         'UCjLEmnpCNeisMxy134KPwWw' => 'こぼ・かなえる', // Kobo Kanaeru
     ],
 
-    'min_references' => 3,
+    // verified references an item needs before it is taught; kana are always taught (alone if need be)
+    'min_references' => ['hiragana' => 0, 'katakana' => 0, 'radical' => 1, 'kanji' => 2, 'vocab' => 1],
 
     'new_items_per_day' => 10,
 

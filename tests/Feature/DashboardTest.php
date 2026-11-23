@@ -37,19 +37,25 @@ class DashboardTest extends TestCase
         $flower = $this->makeItem('kanji', '花', ['はな'], ['flower'], 10);
         $this->withRefs($flower, 4);
         $this->withRefs($this->makeItem('radical', '乙', [], [], 10), 5); // never available
-        $this->withRefs($this->makeItem('katakana', 'ネ', ['ne'], [], 1), 2); // too few
+        $this->makeItem('katakana', 'ネ', ['ne'], [], 1); // kana: always available
+        $this->withRefs($this->makeItem('kanji', '海', ['うみ'], ['sea'], 10), 1); // kanji: needs 2
+        $radical = $this->makeItem('radical', '艹', [], ['grass'], 10);
+        $this->withRefs($radical, 1);
         $user = $this->learner();
         $user->forceFill(['streak_days' => 3, 'last_lesson_on' => now()->setTimezone('Europe/Berlin')->subDay()->toDateString()])->save();
         $this->review($user, $ne, 2, now()->subMinute());
         $this->review($user, $flower, 1, now()->addHour());
+        $gone = $this->makeItem('kanji', '亡', ['ぼう'], ['deceased'], 10);
+        $this->withRefs($gone, 2, 'rejected');
+        $this->review($user, $gone, 2, now()->subHour()); // no verified reference: cannot become a card, not counted
 
         $this->actingAs($user)->get(route('dashboard'))->assertInertia(fn (AssertableInertia $page) => $page
             ->component('dashboard')
             ->where('stats', [
                 'streak_days' => 3,
                 'due_count' => 1,
-                'learned' => ['hiragana' => 1, 'katakana' => 0, 'radical' => 0, 'kanji' => 1, 'vocab' => 0],
-                'available' => ['hiragana' => 2, 'katakana' => 0, 'radical' => 0, 'kanji' => 1, 'vocab' => 0],
+                'learned' => ['hiragana' => 1, 'katakana' => 0, 'radical' => 0, 'kanji' => 2, 'vocab' => 0],
+                'available' => ['hiragana' => 2, 'katakana' => 1, 'radical' => 1, 'kanji' => 1, 'vocab' => 0],
             ]));
 
         $user->forceFill(['last_lesson_on' => now()->subDays(3)->toDateString()])->save();
