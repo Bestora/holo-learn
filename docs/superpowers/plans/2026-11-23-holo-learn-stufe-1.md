@@ -194,6 +194,10 @@ it('prints an invite url', function () {
   - `Kana::loose(string): string` (Hiragana, ohne ー, ohne Leerzeichen;
     `おう→お`, `おお→お`, `えい→え`, `うう→う`, `ゅう→ゅ`, `ょう→ょ`)
   - `Kana::looselyEqual(string $a, string $b): bool`
+  - `Kana::toRomaji(string $kana): string` (Hepburn, klein; っ verdoppelt den
+    Folgekonsonanten, ー verlängert den Vokal; Tests:
+    `はなにぼうれい → hananibourei`, `きゅうくらりん → kyuukurarin`,
+    `あまったる → amattaru`, `ネネ → nene`, `ラプラス・ダークネス → rapurasu daakunesu`)
   - `Kana::isKanaOnly(string): bool`, `Kana::hasJapanese(string): bool`,
     `Kana::kanjiIn(string): array`
   - `TextCleaner::talentName(string $channelName, string $englishName): ?string`
@@ -471,7 +475,11 @@ Items für Kanji/Vokabel/Radikal werden bei Bedarf aus dict_* angelegt.
   - `AnswerChecker::check(Item $item, Reference $ref, string $field, string $answer): bool`
   - Routen: `GET /learn` (Inertia-Seite `learn/index`, Prop `card`),
     `POST /learn/answer` (`item_id`, `reference_id`, `reading?`, `meaning?`,
-    `choice?`, `override?`) → `{correct, expected, next_due}`,
+    `choice?`, `override?`) → `{correct, expected, next_due, reveal}`; `reveal` =
+    `{reading, romaji, meaning, words: [{surface, reading, romaji}]}` für die
+    ganze Referenz (Romaji per `Kana::toRomaji`). Romaji steht ausschließlich in
+    dieser Antwort, nie in den Props der Karte – getestet: Prop `card` von
+    `GET /learn` enthält weder `romaji` noch `reading`,
     `POST /occurrences/{id}/dead`, `GET|PUT /favorites`.
 
 Regeln:
@@ -538,6 +546,12 @@ Antwort:     Lesung: Kana::fromRomaji oder direkte Kana, loose-Vergleich mit
   Übersetzung mit Kennzeichnung „automatisch übersetzt“ bzw. Holodex-Zweitform),
   der Clip startet, Enter lädt die nächste Karte. Knopf „war doch richtig“ bei
   falscher Bedeutung. Bei Namen steht „Lesung in diesem Namen“.
+  Die Auflösung zeigt die ganze Referenz Wort für Wort in drei Zeilen
+  (Original, Kana, Romaji) – Romaji erscheint nur hier, nie vor der Antwort.
+  Dazu ein Knopf „Vorlesen“, der die Kana-Lesung über die Sprachausgabe des
+  Browsers spricht (`speechSynthesis`, `lang="ja-JP"`); gibt es keine
+  japanische Stimme, wird der Knopf ausgeblendet. Grund: Ein Songtitel wird im
+  Clip gesungen, aber selten ausgesprochen.
 - [ ] **Step 4:** `youtube-clip.tsx`: YouTube-IFrame-Player-API mit `start` und
   `end`; bei Player-Fehler (Codes 100, 101, 150) `POST /occurrences/{id}/dead`
   und die Karte als reinen Text zeigen. Der Clip wird erst nach der Antwort
