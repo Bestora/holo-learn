@@ -546,8 +546,11 @@ Antwort:     Lesung: Kana::fromRomaji oder direkte Kana, loose-Vergleich mit
   Übersetzung mit Kennzeichnung „automatisch übersetzt“ bzw. Holodex-Zweitform),
   der Clip startet, Enter lädt die nächste Karte. Knopf „war doch richtig“ bei
   falscher Bedeutung. Bei Namen steht „Lesung in diesem Namen“.
-  Die Auflösung zeigt die ganze Referenz Wort für Wort in drei Zeilen
-  (Original, Kana, Romaji) – Romaji erscheint nur hier, nie vor der Antwort.
+  Die Auflösung zeigt die ganze Referenz Wort für Wort mit Furigana: die
+  Kana-Lesung klein über jedem Wort, das Kanji enthält (natives HTML
+  `<ruby>`/`<rt>`, keine Bibliothek; reine Kana-Wörter bekommen keine
+  Furigana), darunter je Wort die Romaji-Zeile. Furigana und Romaji erscheinen
+  nur hier, nie vor der Antwort.
   Dazu ein Knopf „Vorlesen“, der die Kana-Lesung über die Sprachausgabe des
   Browsers spricht (`speechSynthesis`, `lang="ja-JP"`); gibt es keine
   japanische Stimme, wird der Knopf ausgeblendet. Grund: Ein Songtitel wird im
