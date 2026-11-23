@@ -297,6 +297,79 @@ class SongSyncTest extends TestCase
         $this->artisan('holodex:sync', ['--songs' => true, '--channel' => 'UCnope'])->assertFailed();
     }
 
+    private function storedSong(Talent $talent, string $textJa, string $sourceId, string $status = 'new'): Occurrence
+    {
+        $reference = Reference::firstOrCreateFor('song', $textJa, null);
+        $reference->update(['status' => $status]);
+
+        return Occurrence::query()->create([
+            'reference_id' => $reference->id, 'talent_id' => $talent->id, 'video_id' => 'v', 'source_id' => $sourceId,
+        ]);
+    }
+
+    public function test_recleaned_title_moves_occurrence_and_drops_orphaned_new_reference(): void
+    {
+        $talent = $this->talent('UCnene');
+        $moved = $this->storedSong($talent, 'ファンサ／Fansa', 'song:v1:0');
+        $annotated = $this->storedSong($talent, 'ジェンガ／Jenga', 'song:v2:0', 'annotated');
+        $dropped = $this->storedSong($talent, 'from Y to Y feat.初音ミク', 'song:v3:0');
+        $this->fakeSongs(['UCnene' => [[
+            $this->song('ファンサ／Fansa', 'v1'), $this->song('ジェンガ／Jenga', 'v2'), $this->song('from Y to Y feat.初音ミク', 'v3'),
+        ]]]);
+
+        $sync = app(SongSync::class);
+        $this->assertSame(0, $sync->run($talent, full: true));
+
+        $this->assertSame('ファンサ', $moved->fresh()?->reference?->text_ja);
+        $this->assertSame('ジェンガ', $annotated->fresh()?->reference?->text_ja);
+        $this->assertNull($dropped->fresh(), 'title without Japanese after re-cleaning loses its occurrence');
+        $this->assertEqualsCanonicalizing(['ファンサ', 'ジェンガ', 'ジェンガ／Jenga'], Reference::query()->pluck('text_ja')->all());
+        $this->assertSame(2, $sync->deletedReferences);
+    }
+
+    public function test_incremental_run_after_aborted_first_run_stops_early_and_full_run_fetches_the_rest(): void
+    {
+        $talent = $this->talent('UCnene');
+        $list = $this->songs(120);
+        $broken = true;
+        Http::fake(function ($request) use ($list, &$broken) {
+            $offset = (int) $request->data()['offset'];
+            if ($broken && $offset >= 50) {
+                return Http::response([], 502);
+            }
+
+            return Http::response(['total' => 120, 'items' => array_slice($list, $offset, 50)]);
+        });
+
+        try {
+            $this->sync($talent);
+            $this->fail('HolodexException expected');
+        } catch (HolodexException) {
+        }
+        $this->assertSame(50, Occurrence::count());
+        $broken = false;
+
+        // documented limit: the first page is fully known, so the incremental run stops there
+        $this->assertSame(0, $this->sync($talent));
+        $this->assertSame(50, Occurrence::count());
+
+        $this->assertSame(70, app(SongSync::class)->run($talent, full: true));
+        $this->assertSame(120, Occurrence::count());
+    }
+
+    public function test_command_full_option_walks_all_pages(): void
+    {
+        $talent = $this->talent('UCnene');
+        $list = $this->songs(120);
+        Http::fake(fn ($request) => Http::response(['total' => 120, 'items' => array_slice($list, (int) $request->data()['offset'], 50)]));
+        app(SongSync::class)->run($talent);
+
+        $this->artisan('holodex:sync', ['--songs' => true])->assertSuccessful();
+        $this->artisan('holodex:sync', ['--songs' => true, '--full' => true])->assertSuccessful();
+
+        Http::assertSentCount(3 + 1 + 3);
+    }
+
     public function test_reference_texts_are_text_columns(): void
     {
         // sqlite ignores varchar lengths, so check the declared type
@@ -304,11 +377,15 @@ class SongSyncTest extends TestCase
         $this->assertSame('text', Schema::getColumnType('refs', 'alt_text'));
     }
 
-    public function test_scheduler_runs_sync_daily(): void
+    public function test_scheduler_runs_incremental_daily_and_full_weekly(): void
     {
-        $event = collect(app(Schedule::class)->events())->sole(fn (Event $e) => str_contains((string) $e->command, 'holodex:sync'));
+        $events = collect(app(Schedule::class)->events())
+            ->filter(fn (Event $e) => str_contains((string) $e->command, 'holodex:sync'))
+            ->mapWithKeys(fn (Event $e) => [mb_trim(mb_substr((string) $e->command, mb_strpos((string) $e->command, 'holodex:sync'))) => $e]);
 
-        $this->assertSame('30 3 * * *', $event->expression);
-        $this->assertTrue($event->withoutOverlapping);
+        $this->assertEqualsCanonicalizing(['holodex:sync', 'holodex:sync --full'], $events->keys()->all());
+        $this->assertSame('30 3 * * *', $events['holodex:sync']->expression);
+        $this->assertSame('30 4 * * 0', $events['holodex:sync --full']->expression);
+        $this->assertTrue($events->every(fn (Event $e) => $e->withoutOverlapping));
     }
 }

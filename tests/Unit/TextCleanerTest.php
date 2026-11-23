@@ -3,6 +3,7 @@
 namespace Tests\Unit;
 
 use App\Japanese\TextCleaner;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 class TextCleanerTest extends TestCase
@@ -57,5 +58,44 @@ class TextCleanerTest extends TestCase
         $this->assertSame(['text_ja' => null, 'alt' => null], TextCleaner::songName('Song (カバー)'));
         $this->assertSame(['text_ja' => null, 'alt' => null], TextCleaner::songName('A/B'));
         $this->assertSame(['text_ja' => null, 'alt' => null], TextCleaner::songName(''));
+    }
+
+    /** @return array<string, array{string, ?string, ?string}> */
+    public static function realSongTitles(): array
+    {
+        // Titles from the Nene run (2026-11-23) that the first cleaner left uncut.
+        return [
+            'full-width slash' => ['ファンサ／Fansa', 'ファンサ', 'Fansa'],
+            'full-width slash 2' => ['ジェンガ／Jenga', 'ジェンガ', 'Jenga'],
+            'full-width slash 3' => ['アイドル／Idol', 'アイドル', 'Idol'],
+            'full-width slash 4' => ['ピエロ／Pierrot', 'ピエロ', 'Pierrot'],
+            'full-width slash 5' => ['東京サマーセッション／Tokyo Summer Session', '東京サマーセッション', 'Tokyo Summer Session'],
+            'full-width slash 6' => ['シュガーソングとビターステップ／Sugar Song and Bitter Step', 'シュガーソングとビターステップ', 'Sugar Song and Bitter Step'],
+            'full-width slash 7' => ['トウキョウ・シャンディ・ランデヴ／Tokyo Shandy Rendez-vous', 'トウキョウ・シャンディ・ランデヴ', 'Tokyo Shandy Rendez-vous'],
+            'slash, space after' => ['チャンス！/ Chance', 'チャンス！', 'Chance'],
+            'slash, space after 2' => ['言って。/ Say It.', '言って。', 'Say It.'],
+            'slash, space after 3' => ['脱げばいいってモンじゃない！/ Nugeba ii tte Mon ja nai!', '脱げばいいってモンじゃない！', 'Nugeba ii tte Mon ja nai!'],
+            'slash, space after 4' => ['こちら、幸福安心委員会です。/ This Is the Happiness and Peace of Mind Commitee', 'こちら、幸福安心委員会です。', 'This Is the Happiness and Peace of Mind Commitee'],
+            'slash, space after 5' => ['雪、無音、窓辺にて。/ Yuki, Muon, Madobe Nite.', '雪、無音、窓辺にて。', 'Yuki, Muon, Madobe Nite.'],
+            'slash, space after 6' => ["今はいいんだよ。/ It's Okay Now", '今はいいんだよ。', "It's Okay Now"],
+            'feat. without space' => ['サリシノハラ feat.初音ミク', 'サリシノハラ', null],
+            'feat. before slash' => ['天ノ弱 feat.GUMI / Amanojaku', '天ノ弱', 'Amanojaku'],
+            'dash suffix' => ['晩餐歌 - Bansanka', '晩餐歌', 'Bansanka'],
+            'lenticular brackets' => ['みくみくにしてあげる♪【してやんよ】 / Mikumiku ni Shiteageru', 'みくみくにしてあげる♪', 'Mikumiku ni Shiteageru'],
+            // only Japanese was the featured singer: the title itself is Latin
+            'feat. leaves Latin title' => ['from Y to Y feat.初音ミク', null, null],
+            // general rules, synthetic
+            'ft. with space' => ['フレンズ ft. Mio', 'フレンズ', null],
+            'featuring, any case' => ['フレンズ FEATURING Mio / Friends', 'フレンズ', 'Friends'],
+            'lenticular in the middle' => ['【MV】フレンズ / Friends', 'フレンズ', 'Friends'],
+            'dash suffix with Japanese stays' => ['恋 - 愛の歌', '恋 - 愛の歌', null],
+            'slash alt wins over dash' => ['恋 - Koi / Love', '恋', 'Love'],
+        ];
+    }
+
+    #[DataProvider('realSongTitles')]
+    public function test_song_name_splits_and_strips(string $name, ?string $textJa, ?string $alt): void
+    {
+        $this->assertSame(['text_ja' => $textJa, 'alt' => $alt], TextCleaner::songName($name));
     }
 }

@@ -9,3 +9,5 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('holodex:sync')->dailyAt('03:30')->withoutOverlapping();
+// Incremental runs stop at the first known page; the weekly full run catches gaps (aborted runs, songs added to old videos).
+Schedule::command('holodex:sync --full')->weeklyOn(0, '04:30')->withoutOverlapping();

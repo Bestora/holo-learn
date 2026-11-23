@@ -15,7 +15,8 @@ class HolodexSync extends Command
     protected $signature = 'holodex:sync
         {--talents : Nur Talente abgleichen}
         {--songs : Nur Songs abgleichen}
-        {--channel= : Songs nur für diesen Holodex-Kanal}';
+        {--channel= : Songs nur für diesen Holodex-Kanal}
+        {--full : Songs: alle Seiten abrufen statt bei der ersten bekannten Seite aufzuhören}';
 
     protected $description = 'Gleicht Talente und Songs mit Holodex ab (ohne Option: beides)';
 
@@ -62,9 +63,10 @@ class HolodexSync extends Command
         $ok = true;
         foreach ($talents as $talent) {
             try {
-                $created = $songs->run($talent);
+                $created = $songs->run($talent, (bool) $this->option('full'));
                 $this->info("Songs {$talent->name_en}: {$created} neue Fundstellen, "
-                    ."{$songs->skippedNoJapanese} ohne Japanisch, {$songs->skippedMalformed} fehlerhaft, {$songs->requests} Abrufe");
+                    ."{$songs->skippedNoJapanese} ohne Japanisch, {$songs->skippedMalformed} fehlerhaft, "
+                    ."{$songs->deletedReferences} verwaiste Referenzen gelöscht, {$songs->requests} Abrufe");
             } catch (HolodexException $e) {
                 $this->logFailure($e, "Songs {$talent->name_en} ({$talent->holodex_channel_id}) fehlgeschlagen", $talent->holodex_channel_id);
                 $ok = false;

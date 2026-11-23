@@ -23,12 +23,19 @@ class SongSync
 
     public int $requests = 0;
 
+    /** Song references deleted because re-cleaning left them unannotated and unused. */
+    public int $deletedReferences = 0;
+
     public function __construct(private Client $client) {}
 
-    /** @return int number of new occurrences */
-    public function run(Talent $talent): int
+    /**
+     * $full walks all pages; otherwise the run stops at the first page that adds nothing new.
+     *
+     * @return int number of new occurrences
+     */
+    public function run(Talent $talent, bool $full = false): int
     {
-        $this->skippedNoJapanese = $this->skippedMalformed = $this->requests = 0;
+        $this->skippedNoJapanese = $this->skippedMalformed = $this->requests = $this->deletedReferences = 0;
         $created = 0;
         $offset = 0;
         $progressFile = config('hololearn.progress_file');
@@ -62,7 +69,7 @@ class SongSync
 
                 // Incremental run: a page that adds nothing but holds already stored songs means the rest is known too.
                 // A page of only non-Japanese titles has no stored songs, so it does not stop a first run.
-                $pageKnown = $new === 0 && $known > 0;
+                $pageKnown = ! $full && $new === 0 && $known > 0;
             } while (count($items) >= self::PAGE_SIZE && $offset < $total && ! $pageKnown && $this->requests < self::MAX_PAGES);
         } finally {
             if (is_string($progressFile)) {
@@ -84,24 +91,38 @@ class SongSync
             return 'skipped';
         }
 
-        ['text_ja' => $textJa, 'alt' => $alt] = TextCleaner::songName((string) $name);
-        if ($textJa === null) {
-            $this->skippedNoJapanese++;
-
-            return 'skipped';
-        }
-
         /** @var array<string, mixed> $item */
         $start = is_numeric($item['start'] ?? null) ? (int) $item['start'] : null;
         $end = is_numeric($item['end'] ?? null) ? (int) $item['end'] : null;
         $sourceId = "song:{$videoId}:".($start ?? 0);
 
-        if (Occurrence::query()->where('source_id', $sourceId)->exists()) {
+        $occurrence = Occurrence::query()->with('reference')->firstWhere('source_id', $sourceId);
+        $previous = $occurrence?->reference;
+
+        ['text_ja' => $textJa, 'alt' => $alt] = TextCleaner::songName((string) $name);
+        if ($textJa === null) {
+            // A stored title may lose its Japanese under newer cleaning rules.
+            $occurrence?->delete();
+            $this->dropIfOrphaned($previous);
+            $this->skippedNoJapanese++;
+
+            return 'skipped';
+        }
+
+        $reference = Reference::firstOrCreateFor('song', $textJa, $alt);
+
+        if ($occurrence !== null) {
+            if ($occurrence->reference_id !== $reference->id) {
+                // Re-cleaned title: move the occurrence, drop the old reference if nothing else uses it.
+                $occurrence->update(['reference_id' => $reference->id]);
+                $this->dropIfOrphaned($previous);
+            }
+
             return 'known';
         }
 
         Occurrence::query()->create([
-            'reference_id' => Reference::firstOrCreateFor('song', $textJa, $alt)->id,
+            'reference_id' => $reference->id,
             'talent_id' => $talent->id,
             'video_id' => (string) $videoId,
             'start_s' => $start,
@@ -110,5 +131,13 @@ class SongSync
         ]);
 
         return 'new';
+    }
+
+    private function dropIfOrphaned(?Reference $reference): void
+    {
+        if ($reference !== null && $reference->status === 'new' && ! $reference->occurrences()->exists()) {
+            $reference->delete();
+            $this->deletedReferences++;
+        }
     }
 }
