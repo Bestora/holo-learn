@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * A user's spaced-repetition state for one item.
@@ -14,9 +14,9 @@ use Illuminate\Support\Carbon;
  * @property int $user_id
  * @property int $item_id
  * @property int $stage 0–8
- * @property Carbon $due_at
+ * @property CarbonImmutable $due_at
  * @property ?int $last_reference_id
- * @property Carbon $created_at
+ * @property CarbonImmutable $created_at
  */
 #[Fillable(['user_id', 'item_id', 'stage', 'due_at', 'last_reference_id'])]
 class Review extends Model

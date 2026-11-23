@@ -2,10 +2,10 @@
 
 namespace App\Models;
 
+use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Support\Carbon;
 
 /**
  * A run of up to `size` cards. Layout of `state`: see App\Learning\LessonFlow.
@@ -18,11 +18,13 @@ use Illuminate\Support\Carbon;
  * @property int $wrong
  * @property int $new_items
  * @property array<string, mixed> $state
- * @property ?Carbon $finished_at
+ * @property ?CarbonImmutable $finished_at
  */
 #[Fillable(['user_id', 'size', 'position', 'correct', 'wrong', 'new_items', 'state', 'finished_at'])]
 class Lesson extends Model
 {
+    protected $attributes = ['position' => 0, 'correct' => 0, 'wrong' => 0, 'new_items' => 0];
+
     protected function casts(): array
     {
         return [

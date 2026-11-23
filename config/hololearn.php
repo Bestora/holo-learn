@@ -100,4 +100,13 @@ return [
 
     'intervals_hours' => [4, 8, 24, 48, 168, 336, 720, 2880],
 
+    // cards per lesson
+    'lesson_size' => 10,
+
+    // a special (bonus) item is at most every n-th new item
+    'special_every' => 5,
+
+    // day boundaries for the daily new-item limit and the streak
+    'timezone' => 'Europe/Berlin',
+
 ];
