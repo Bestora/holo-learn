@@ -254,20 +254,26 @@ expect(TextCleaner::songName('Ridin\' on Dreams'))->toBe(['text_ja' => null, 'al
   - `php artisan holodex:sync {--talents} {--songs} {--channel=}` (ohne Option: beides).
 
 - [ ] **Step 1: Failing tests:**
-  - Zwei Seiten à 50/3 Kanäle gefälscht → 53 Talente; zweiter Lauf: weiterhin 53.
+  - Zwei Seiten à 50/3 Kanäle gefälscht (ohne HOLOSTARS) → 53 Talente; zweiter
+    Lauf: weiterhin 53.
   - `Nene Ch.桃鈴ねね` → Talent `name_ja=桃鈴ねね`, eine `Reference(kind=name,
     text_ja=桃鈴ねね, alt_text='Momosuzu Nene')` mit einer `Occurrence`
     (`source_id='name:UCAWSyEs_Io8MtpY3m-zqILA'`, kein Video).
   - `Takanashi Kiara SubCh.` und `hololive ReGLOSS` → `is_secondary=true`, keine
     Namens-Referenz (Regel: `english_name` leer, oder Name enthält `Sub`,
     oder `talentName()` liefert `null`).
+  - HOLOSTARS wird nicht importiert: Kanäle, deren `group`, `name` oder
+    `english_name` ohne Beachtung der Großschreibung `holostars` enthält
+    (z. B. Gruppe `HOLOSTARS UPROAR!!`, Kanal `HOLOSTARS English`), erzeugen
+    kein Talent.
   - Kanal aus der Vorrangliste bekommt `priority` = Position in der Liste.
   - Antwort 403 → `HolodexException`, bereits gespeicherte Talente bleiben.
   - Antwort ohne Feld `id` in einem Eintrag → dieser Eintrag wird übersprungen
     und protokolliert, die übrigen gespeichert.
 - [ ] **Step 2–4:** fehlschlagen lassen, umsetzen (Seiten holen, bis eine Seite
   weniger als 50 liefert), grün. Lokal `php artisan holodex:sync --talents`
-  gegen die echte API: 138 Kanäle erwartet (Stand 2026-11-23). Commit.
+  gegen die echte API: 108 Talente erwartet (138 Kanäle minus 30 HOLOSTARS,
+  Stand 2026-11-23). Commit.
 
 ### Task 5: Songs importieren
 

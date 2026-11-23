@@ -333,7 +333,10 @@ Server, beim Deploy: Annotationen einlesen → Prüfung → Zerlegung
 
 - Holodex führt unter `org=Hololive` 138 Kanäle, darunter HOLOSTARS, mekPark,
   Zweitkanäle („Takanashi Kiara SubCh.“) und offizielle Gruppenkanäle
-  („hololive ReGLOSS“). Vorschlag des Entwurfs: Alle werden importiert;
+  („hololive ReGLOSS“). **HOLOSTARS bleibt draußen** (Entscheidung des
+  Auftraggebers): 28 Kanäle mit Gruppe `HOLOSTARS…` und die zwei offiziellen
+  HOLOSTARS-Kanäle; es bleiben 108. Vorschlag des Entwurfs für den Rest:
+  Alle werden importiert;
   Zweit- und Gruppenkanäle liefern Songs, Titel und Clips, aber keine
   Namens-Referenz. Inaktive Talente bleiben mit ihrem Archiv dabei.
 ## Betrieb (vom Auftraggeber vorgegeben)
