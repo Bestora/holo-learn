@@ -80,6 +80,30 @@ class AnnotationsLintTest extends TestCase
         $this->assertSame($this->line('b')."\n".$this->line('a', 'second')."\n", File::get($this->file));
     }
 
+    public function test_fix_handles_bad_line_and_duplicate_together(): void
+    {
+        File::put($this->file, $this->line('a', 'first')."\nbroken\n".$this->line('b')."\n".$this->line('a', 'second'));
+
+        $this->artisan('annotations:lint', ['file' => $this->file, '--fix' => true])
+            ->expectsOutputToContain('2 Zeilen entfernt')
+            ->assertExitCode(0);
+
+        $this->assertSame($this->line('b')."\n".$this->line('a', 'second')."\n", File::get($this->file));
+    }
+
+    public function test_unreadable_file_fails(): void
+    {
+        if (posix_getuid() === 0) {
+            $this->markTestSkipped('root can read any file');
+        }
+        File::put($this->file, $this->line('a')."\n");
+        chmod($this->file, 0);
+
+        $this->artisan('annotations:lint', ['file' => $this->file])
+            ->expectsOutputToContain('Datei nicht lesbar')
+            ->assertExitCode(1);
+    }
+
     public function test_bom_on_first_line_is_ignored(): void
     {
         File::put($this->file, "\xEF\xBB\xBF".$this->line('a')."\n");

@@ -24,6 +24,11 @@ class AnnotationsLint extends Command
 
             return self::FAILURE;
         }
+        if (! is_readable($file)) {
+            $this->error("Datei nicht lesbar: {$file}");
+
+            return self::FAILURE;
+        }
 
         $name = basename($file);
         $total = $bad = 0;
@@ -45,7 +50,10 @@ class AnnotationsLint extends Command
         }
 
         if ($this->option('fix')) {
-            File::put($file, implode('', array_map(fn ($entry) => $entry[1]."\n", $valid)));
+            // temp file + rename: an interrupted write must not truncate the original
+            $tmp = $file.'.tmp-'.getmypid();
+            File::put($tmp, implode('', array_map(fn ($entry) => $entry[1]."\n", $valid)));
+            File::move($tmp, $file);
             $this->info(($total - count($valid)).' Zeilen entfernt');
 
             return self::SUCCESS;

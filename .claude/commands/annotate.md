@@ -11,20 +11,22 @@ erzeugt die Daten, der Server importiert und prüft sie.
 
 Argumente: `$ARGUMENTS`
 
-- erste Zahl = Limit (Standard `200`)
+- erste Zahl = `<limit>` (Standard `200`)
 - `--retry-rejected` = abgelehnte Referenzen erneut versuchen, Subagenten mit Modell `sonnet` statt `haiku`
 - `--push` = nach dem Commit den aktuellen Branch pushen
 
 ## Regeln für diesen Lauf
 
-- `<scratchpad>` ist dein Scratchpad-Verzeichnis aus dem System-Prompt. Alle Zwischendateien liegen dort.
-  Platzhalter wie `<n>`, `<scratchpad>` und `<stamp>` in jedem Befehl wörtlich einsetzen: Shell-Variablen
-  bleiben zwischen Bash-Aufrufen nicht erhalten.
+- `<work>` ist `<scratchpad>/annotate`, wobei `<scratchpad>` dein Scratchpad-Verzeichnis aus dem
+  System-Prompt ist. Alle Zwischendateien liegen in `<work>`; nur dieses Verzeichnis wird gelöscht.
+- Platzhalter (`<limit>`, `<work>`, `<stamp>`, `<lines>`, `<session_id>`) in jedem Befehl wörtlich einsetzen:
+  Shell-Variablen bleiben zwischen Bash-Aufrufen nicht erhalten.
 - Paketinhalte und Subagenten-Ergebnisse NICHT in deinen eigenen Kontext holen (kein `cat`/`Read` auf
   Pakete oder Ergebnisdateien). Zählen mit `wc -l` ist erlaubt.
-- Fortschritt für die Statuszeile: nach jedem fertigen Paket eine Zeile `<fertige Pakete> <Pakete gesamt> Annotieren`
-  nach `~/.claude/progress/<session_id>-annotate` schreiben (`<session_id>` steht im Scratchpad-Pfad).
-  Am Ende (auch bei Abbruch) `rm -f ~/.claude/progress/<session_id>-annotate`.
+- Fortschritt für die Statuszeile: zu Beginn `mkdir -p ~/.claude/progress`, nach jedem fertigen Paket eine
+  Zeile `<fertige Pakete> <Pakete gesamt> Annotieren` nach `~/.claude/progress/<session_id>-annotate` schreiben
+  (`<session_id>` steht im Scratchpad-Pfad). Bei JEDEM Ende, auch bei jedem vorzeitigen Abbruch:
+  `rm -f ~/.claude/progress/<session_id>-annotate`.
 - Nie den Import auf dem Server ausführen, auch nicht per `ssh`.
 - Ein Paket, das nichts liefert (Subagent scheitert oder schreibt 0 Zeilen), wird übersprungen, nicht im
   selben Lauf wiederholt.
@@ -33,30 +35,34 @@ Argumente: `$ARGUMENTS`
 
 ### 1. Export
 
+Zuerst Reste eines früheren Laufs entfernen, damit keine alten Pakete oder Ergebnisse mitlaufen:
+
 ```bash
-php artisan annotations:export --limit=<n> [--retry-rejected] > <scratchpad>/pending.jsonl
-wc -l < <scratchpad>/pending.jsonl
+rm -rf <scratchpad>/annotate
+mkdir -p <work>/packs <work>/out ~/.claude/progress
+php artisan annotations:export --limit=<limit> [--retry-rejected] > <work>/pending.jsonl
+wc -l < <work>/pending.jsonl
 ```
 
 Alternative gegen die Server-Datenbank (nach dem Deploy):
 
 ```bash
-ssh ubuntu@u0x.de 'cd /opt/holo-learn && docker compose exec -T app php artisan annotations:export --limit=<n>' > <scratchpad>/pending.jsonl
+ssh ubuntu@u0x.de 'cd /opt/holo-learn && docker compose exec -T app php artisan annotations:export --limit=<limit>' > <work>/pending.jsonl
 ```
 
-Ist die Datei leer: dem Nutzer „nichts offen“ melden und aufhören.
+Ist die Datei leer: `rm -f ~/.claude/progress/<session_id>-annotate`, dem Nutzer „nichts offen“ melden
+und aufhören.
 
 ### 2. Pakete und Subagenten
 
 ```bash
-mkdir -p <scratchpad>/packs <scratchpad>/out
-split -l 25 <scratchpad>/pending.jsonl <scratchpad>/packs/pack-
-ls <scratchpad>/packs
+split -l 25 <work>/pending.jsonl <work>/packs/pack-
+ls <work>/packs
 ```
 
 Je Paket ein Subagent (Agent-Tool), Modell `haiku` (mit `--retry-rejected`: `sonnet`). Mehrere Pakete
 parallel starten (mehrere Agent-Aufrufe in einer Nachricht). Jeder Subagent schreibt in seine eigene
-Datei `<scratchpad>/out/<paketname>.jsonl` und antwortet nur mit einer Zählzeile.
+Datei `<work>/out/<paketname>.jsonl` und antwortet nur mit einer Zählzeile.
 
 ### 3. Auftrag an jeden Subagenten
 
@@ -83,17 +89,24 @@ Antworte am Ende nur mit: "<Anzahl geschriebener Zeilen> von <Anzahl gelesener Z
 ### 4. Zusammenführen und prüfen
 
 ```bash
-date +%Y-%m-%d-%H%M   # Ausgabe = <stamp>
-mkdir -p data/annotations
-cat <scratchpad>/out/*.jsonl > data/annotations/<stamp>.jsonl
-php artisan annotations:lint data/annotations/<stamp>.jsonl --fix
-php artisan annotations:lint data/annotations/<stamp>.jsonl   # muss mit Exit 0 enden
-wc -l < data/annotations/<stamp>.jsonl
+ls <work>/out | wc -l
 ```
 
-Liegt in `<scratchpad>/out/` keine Datei, gleich mit einem Bericht aufhören. Fehlerhafte Zeilen werden
-entfernt, nicht repariert. Ist die Datei danach leer: löschen und mit einem
-Bericht an den Nutzer aufhören.
+Ist das 0 (kein Paket hat etwas geliefert): `rm -f ~/.claude/progress/<session_id>-annotate`, Bericht an
+den Nutzer, aufhören. Sonst:
+
+```bash
+date +%Y-%m-%d-%H%M   # Ausgabe = <stamp>
+mkdir -p data/annotations
+# nach jeder Datei ein Zeilenumbruch, falls der Subagent den letzten weggelassen hat; Leerzeilen entfernt --fix
+for f in <work>/out/*.jsonl; do cat "$f"; echo; done > data/annotations/<stamp>.jsonl
+php artisan annotations:lint data/annotations/<stamp>.jsonl --fix
+php artisan annotations:lint data/annotations/<stamp>.jsonl   # muss mit Exit 0 enden
+wc -l < data/annotations/<stamp>.jsonl   # Ausgabe = <lines>
+```
+
+Fehlerhafte Zeilen werden entfernt, nicht repariert. Ist `<lines>` 0: die Datei löschen,
+`rm -f ~/.claude/progress/<session_id>-annotate`, Bericht an den Nutzer, aufhören.
 
 ### 5. Lokal importieren
 
@@ -106,15 +119,15 @@ mit ihren Fehlercodes.
 
 ### 6. Commit
 
-Nur diese eine Datei committen:
+Nur diese eine Datei committen (die Pfadangabe nach `--` lässt anderes, schon Gestagtes außen vor):
 
 ```bash
 git add data/annotations/<stamp>.jsonl
-git commit -m "Add annotations <YYYY-MM-DD> (<n> Zeilen)"
+git commit -m "Add annotations <YYYY-MM-DD> (<lines> Zeilen)" -- data/annotations/<stamp>.jsonl
 ```
 
-Pushen (`git push` des aktuellen Branches) nur, wenn der Aufruf `--push` enthielt; sonst bleibt der Commit
-lokal, und das sagst du dem Nutzer.
+Nur wenn der Aufruf `--push` enthielt: `git push origin HEAD`. Sonst bleibt der Commit lokal, und das
+sagst du dem Nutzer.
 
 Hinweis für den Nutzer (nicht ausführen): Nach dem Deploy importiert der Server mit
 `git pull && docker compose exec app php artisan annotations:import`.
