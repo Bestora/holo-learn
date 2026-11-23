@@ -160,30 +160,10 @@ class Verifier
             return null;
         }
 
-        // The alt_kind claim is not trusted: an alt that converts completely to kana and is
-        // close to the reading is romaji, whatever the annotation says.
-        $romaji = Kana::loose(Kana::fromRomaji($ref->alt_text));
-        $loose = Kana::loose($reading);
-        $looksLikeRomaji = $romaji !== '' && Kana::isKanaOnly($romaji)
-            && self::distance($romaji, $loose) <= 0.4 * max(mb_strlen($romaji), mb_strlen($loose));
+        // The alt_kind claim is not trusted: an alt that converts completely to kana is romaji.
+        $romaji = Kana::fromRomaji($ref->alt_text);
 
-        return $altKind === 'romaji' || $looksLikeRomaji ? $romaji === $loose : null;
-    }
-
-    /** Levenshtein distance on characters (PHP's levenshtein() counts bytes). */
-    private static function distance(string $a, string $b): int
-    {
-        $b = mb_str_split($b);
-        $previous = range(0, count($b));
-        foreach (mb_str_split($a) as $i => $ca) {
-            $current = [$i + 1];
-            foreach ($b as $j => $cb) {
-                $current[] = min($previous[$j + 1] + 1, $current[$j] + 1, $previous[$j] + ($ca === $cb ? 0 : 1));
-            }
-            $previous = $current;
-        }
-
-        return $previous[count($b)];
+        return $altKind === 'romaji' || Kana::isKanaOnly($romaji) ? Kana::matchesRomaji($reading, $romaji) : null;
     }
 
     /**

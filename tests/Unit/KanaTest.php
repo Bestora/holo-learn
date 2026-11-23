@@ -142,4 +142,28 @@ class KanaTest extends TestCase
         $this->assertSame([], Kana::kanjiIn('ねね'));
         $this->assertSame([], Kana::kanjiIn(''));
     }
+
+    /** @return array<string, array{string, string, bool}> */
+    public static function romajiReadings(): array
+    {
+        return [
+            'equal' => ['ももすず', 'ももすず', true],
+            'omitted long vowel' => ['きりゅう', 'きりゅ', true],
+            'omitted ei' => ['せんせい', 'せんせ', true],
+            'long vowel mark' => ['みーむ', 'みいむ', true],
+            'zu and dzu' => ['つづり', 'つずり', true],
+            'separators' => ['ほうしょう・まりん', 'ほうしょう まりん', true],
+            'spelled long vowel missing' => ['ほしょう', 'ほうしょう', false],
+            'wrong long vowel kana' => ['ほうしょお', 'ほうしょう', false],
+            'oo as ou' => ['おうかみ', 'おおかみ', false],
+            'extra o after o' => ['とおこやみ', 'とこやみ', false],
+            'different kana' => ['ほのお', 'ほむら', false],
+        ];
+    }
+
+    #[DataProvider('romajiReadings')]
+    public function test_matches_romaji(string $reading, string $romajiKana, bool $expected): void
+    {
+        $this->assertSame($expected, Kana::matchesRomaji($reading, $romajiKana));
+    }
 }

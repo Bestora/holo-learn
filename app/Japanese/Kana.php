@@ -208,6 +208,45 @@ class Kana
         return self::loose($a) === self::loose($b);
     }
 
+    /**
+     * Whether a reading agrees with the kana of its romanization: loosely equal, and every
+     * kana the romaji spells (long vowels included) present in order. The reading may only
+     * add the long vowels romaji commonly omits: う after an o/u-row kana, い after an e-row
+     * kana (きりゅう for Kiryu ok; ほしょう for Houshou, とおこやみ for Tokoyami not).
+     */
+    public static function matchesRomaji(string $reading, string $romajiKana): bool
+    {
+        $reading = mb_str_split(self::spelledOut($reading));
+        $romaji = mb_str_split(self::spelledOut($romajiKana));
+        if (self::loose(implode('', $reading)) !== self::loose(implode('', $romaji))) {
+            return false;
+        }
+
+        $k = 0;
+        foreach ($reading as $i => $char) {
+            if ($char === ($romaji[$k] ?? null)) {
+                $k++;
+
+                continue;
+            }
+            $vowel = $i > 0 ? substr(self::toRomaji($reading[$i - 1]), -1) : '';
+            $omittable = ($char === 'う' && in_array($vowel, ['o', 'u'], true)) || ($char === 'い' && $vowel === 'e');
+            if (! $omittable) {
+                return false;
+            }
+        }
+
+        return $k === count($romaji);
+    }
+
+    /** Hiragana without separators, づ/ぢ as ず/じ, ー as the vowel of the kana before it. */
+    private static function spelledOut(string $kana): string
+    {
+        $kana = strtr(preg_replace('/[\s・]+/u', '', self::toHiragana($kana)) ?? '', ['づ' => 'ず', 'ぢ' => 'じ']);
+
+        return preg_replace_callback('/(.)ー/u', fn (array $m) => $m[1].(['a' => 'あ', 'i' => 'い', 'u' => 'う', 'e' => 'え', 'o' => 'お'][substr(self::toRomaji($m[1]), -1)] ?? ''), $kana) ?? $kana;
+    }
+
     public static function isKanaOnly(string $text): bool
     {
         return preg_match('/^['.self::KANA.']+$/u', $text) === 1;

@@ -72,17 +72,10 @@ class NameRomaji
         return false;
     }
 
-    /**
-     * loose() collapses えい across part borders (にのまえ|いなにす), so the parts are
-     * compared both as a whole and part by part.
-     *
-     * @param  list<string>  $parts
-     */
+    /** @param  list<string>  $parts */
     private static function equals(string $reading, array $parts): bool
     {
-        $loose = Kana::loose($reading);
-
-        return $loose !== '' && ($loose === Kana::loose(implode('', $parts)) || $loose === implode('', array_map(Kana::loose(...), $parts)));
+        return $reading !== '' && Kana::matchesRomaji($reading, implode('', $parts));
     }
 
     /**

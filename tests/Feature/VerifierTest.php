@@ -296,6 +296,18 @@ class VerifierTest extends TestCase
             'ao' => ['火威青', 'Hiodoshi Ao', [['火威', 'ひおどし'], ['青', 'あお']], []],
             'calliope' => ['森カリオペ', 'Mori Calliope', [['森', 'もり'], ['カリオペ', 'かりおぺ']], []],
             'suisei' => ['星街すいせい', 'Hoshimachi Suisei', [['星街', 'ほしまち'], ['すいせい', 'すいせい']], []],
+            'houshou missing u' => ['宝鐘マリン', 'Houshou Marine', [['宝鐘', 'ほしょう'], ['マリン', 'まりん']], $rejected],
+            'houshou with o' => ['宝鐘マリン', 'Houshou Marine', [['宝鐘', 'ほうしょお'], ['マリン', 'まりん']], $rejected],
+            'ookami short' => ['大神ミオ', 'Ookami Mio', [['大神', 'おかみ'], ['ミオ', 'みお']], $rejected],
+            'ookami with u' => ['大神ミオ', 'Ookami Mio', [['大神', 'おうかみ'], ['ミオ', 'みお']], $rejected],
+            'tokoyami with extra o' => ['常闇トワ', 'Tokoyami Towa', [['常闇', 'とおこやみ'], ['トワ', 'とわ']], $rejected],
+            'ina without i, one word' => ['一伊那尓栖', "Ninomae Ina'nis", [['一伊那尓栖', 'にのまえなにす']], $rejected],
+            'ina without i, two words' => ['一伊那尓栖', "Ninomae Ina'nis", [['一', 'にのまえ'], ['伊那尓栖', 'なにす']], $rejected],
+            'kiryu with long vowel' => ['桐生ココ', 'Kiryu Coco', [['桐生', 'きりゅう'], ['ココ', 'ここ']], []],
+            'oozora' => ['大空スバル', 'Oozora Subaru', [['大空', 'おおぞら'], ['スバル', 'すばる']], []],
+            'suzuna' => ['鈴鳴つづり', 'Suzuna Tsuzuri', [['鈴鳴', 'すずな'], ['つづり', 'つづり']], []],
+            // ponytail: known ceiling: a spurious long vowel where the romaji omits one passes
+            'spurious long vowel' => ['白銀ノエル', 'Shirogane Noel', [['白銀', 'しろがねい'], ['ノエル', 'のえる']], []],
             'no kanji' => ['ラプラス・ダークネス', 'La+ Darknesss', [['ラプラス', 'らぷらす'], ['・ダークネス', 'だーくねす']], []],
         ];
     }
@@ -362,7 +374,16 @@ class VerifierTest extends TestCase
     {
         return [
             'romaji claimed as translation' => ['女々しくて', 'Memeshikute', [['女々しくて', 'めめしい']], 'translation', 'めめしい', ['romaji_mismatch']],
-            'english translation' => ['嘘ミーム', 'Fake Meme', [['嘘', 'うそ'], ['ミーム', 'みーむ']], 'translation', 'うそみーむ', []],
+            // accepted loss: an English translation that converts completely is checked as romaji
+            'english translation that converts' => ['嘘ミーム', 'Fake Meme', [['嘘', 'うそ'], ['ミーム', 'みーむ']], 'translation', 'うそみーむ', ['romaji_mismatch']],
+            'romaji with long vowel mark' => ['嘘ミーム', 'Uso Miimu', [['嘘', 'うそ'], ['ミーム', 'みーむ']], 'romaji', 'うそみーむ', []],
+            'homura as honoo' => ['炎', 'homura', [['炎', 'ほのお']], 'translation', 'ほのお', ['romaji_mismatch']],
+            'homura' => ['炎', 'homura', [['炎', 'ほむら']], 'translation', 'ほむら', []],
+            'kanade as sou' => ['奏', 'Kanade', [['奏', 'そう']], 'translation', 'そう', ['romaji_mismatch']],
+            'ashita as asu' => ['明日', 'Ashita', [['明日', 'あす']], 'translation', 'あす', ['romaji_mismatch']],
+            'ashita' => ['明日', 'Ashita', [['明日', 'あした']], 'translation', 'あした', []],
+            'sora as kara' => ['空', 'Sora', [['空', 'から']], 'translation', 'から', ['romaji_mismatch']],
+            'kyou as konnichi' => ['今日', 'Kyou', [['今日', 'こんにち']], 'translation', 'こんにち', ['romaji_mismatch']],
             'english title' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], 'translation', 'はなにぼうれい', []],
             'romaji claimed as none' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりん']], 'none', 'きゅうくらりん', []],
             'romaji claimed as none, wrong' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりい']], 'none', 'きゅうくらりい', ['kana_mismatch', 'romaji_mismatch']],
