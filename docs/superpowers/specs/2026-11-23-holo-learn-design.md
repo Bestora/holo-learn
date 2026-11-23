@@ -304,6 +304,38 @@ Server, beim Deploy: Annotationen einlesen → Prüfung → Zerlegung
   Referenzen werden bei der Abfrage bevorzugt, solange der Nutzer keine eigenen
   Favoriten gesetzt hat. Bei EN-Talenten sind viele Stream-Titel englisch;
   Texte ohne japanische Zeichen werden übersprungen.
+- **Vorrangliste zum Start** (vom Auftraggeber genannt, Kanal-IDs am
+  2026-11-23 aus Holodex; Ina, Kronii und Haachama sind Vorschlag des Entwurfs):
+
+  | Talent | Holodex-Kanal |
+  |---|---|
+  | Fuwawa & Mococo Abyssgard | `UCt9H_RpQzhxzlyBxFqrdHqA` |
+  | Mori Calliope | `UCL_qhgtOy0dy1Agp8vkySQg` |
+  | IRyS | `UC8rcEBzJSleTkf_-agPM20g` |
+  | Hakos Baelz | `UCgmPnx-EEeOrZSg5Tiw7ZRQ` |
+  | Takanashi Kiara | `UCHsx4Hqa-1ORjQTh9TYDhww` |
+  | Kureiji Ollie | `UCYz_5n-uDuChHtLo7My1HnQ` |
+  | Minato Aqua (inaktiv) | `UC1opHUrw8rvnsadT-iGp7Cg` |
+  | Hoshimachi Suisei | `UC5CwaMl1eIgY8h02uZw7u8A` |
+  | Sakamata Chloe (inaktiv) | `UCIBY1ollUsauvVi4hW4cumw` |
+  | Tokoyami Towa | `UC1uv2Oq6kNxgATlCiez59hw` |
+  | Juufuutei Raden | `UCdXAk5MpyLD8594lm_OvtGQ` |
+  | Achichi Mela | `UC8eitCE9Z6EwUCs-VUi1blg` |
+  | Tsunomaki Watame | `UCqm3BQLlJfvkTsX_hvm0UmA` |
+  | Momosuzu Nene | `UCAWSyEs_Io8MtpY3m-zqILA` |
+  | La+ Darknesss | `UCENwRMx5Yh42zWpzURebzTw` |
+  | Kazama Iroha | `UC_vMYWcDjmfdpH6r4TTn1MQ` |
+  | Sorashina Sopia | `UCROQtXcp2loQEmvpe5rhJzQ` |
+  | Kiryu Coco (inaktiv) | `UCS9uQI-jC3DE0L4IpXyvr6w` |
+  | Ninomae Ina'nis | `UCMwGHR0BTZuLsmjY_NT5Pwg` |
+  | Ouro Kronii | `UCmbs8T6MWqUHP1tIQvSgKrg` |
+  | Akai Haato | `UC1CfXB_kRs3C-zaeTG3oGyg` |
+
+- Holodex führt unter `org=Hololive` 138 Kanäle, darunter HOLOSTARS, mekPark,
+  Zweitkanäle („Takanashi Kiara SubCh.“) und offizielle Gruppenkanäle
+  („hololive ReGLOSS“). Vorschlag des Entwurfs: Alle werden importiert;
+  Zweit- und Gruppenkanäle liefern Songs, Titel und Clips, aber keine
+  Namens-Referenz. Inaktive Talente bleiben mit ihrem Archiv dabei.
 ## Betrieb (vom Auftraggeber vorgegeben)
 
 - Repo: `https://github.com/Bestora/holo-learn`, Commits als
