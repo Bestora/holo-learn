@@ -13,8 +13,7 @@ class VocabMatcher
 {
     /**
      * Kanji words: the surface if it is in the dictionary with the word's reading, else the
-     * lemma (the verifier accepted the word through it). Loanwords: the surface if it is in
-     * the dictionary, with the meanings of all its rows.
+     * lemma (the verifier accepted the word through it). Loanwords: see loanword().
      *
      * @param  list<int>  $indexes  words with kanji
      * @param  list<int>  $loanwords  katakana words
@@ -29,10 +28,10 @@ class VocabMatcher
 
         $vocab = [];
         foreach ($loanwords as $i) {
-            $rows = $dictionary[$words[$i]['surface']] ?? null;
-            if ($rows !== null) {
-                $meanings = array_slice(array_values(array_unique(array_merge(...$rows->flatMap(fn (DictWord $w) => $w->glosses)->all()))), 0, 5);
-                $vocab[$i] = ['spelling' => $words[$i]['surface'], 'readings' => [Kana::toHiragana($words[$i]['reading'])], 'meanings' => $meanings, 'level' => ItemLevel::vocab($rows->contains('common', true), [])];
+            $entry = self::loanword($words[$i]['surface'], $dictionary[$words[$i]['surface']] ?? collect());
+            if ($entry !== null) {
+                $meanings = array_slice(array_values(array_unique(array_merge(...$entry->glosses))), 0, 5);
+                $vocab[$i] = ['spelling' => $words[$i]['surface'], 'readings' => [Kana::toHiragana($words[$i]['reading'])], 'meanings' => $meanings, 'level' => ItemLevel::vocab($entry->common, [])];
             }
         }
         foreach ($indexes as $i) {
@@ -55,5 +54,24 @@ class VocabMatcher
         }
 
         return $vocab;
+    }
+
+    /**
+     * The one entry a katakana word unambiguously means, so no wrong meaning is taught
+     * (オラ "hola" for おら "I", レイ "lei" for the name Rei): the only common entry, else the
+     * only entry at all if the word has 4+ characters (short words are too ambiguous).
+     *
+     * @param  Collection<int, DictWord>  $rows
+     */
+    private static function loanword(string $surface, Collection $rows): ?DictWord
+    {
+        $entries = $rows->sortByDesc('common')->unique(fn (DictWord $w) => $w->reading.json_encode($w->glosses)); // duplicate rows = one entry
+        $common = $entries->where('common', true);
+
+        return match (true) {
+            $common->count() === 1 => $common->first(),
+            $entries->count() === 1 && mb_strlen($surface) >= 4 => $entries->first(),
+            default => null,
+        };
     }
 }

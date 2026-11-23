@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Annotations\Decomposer;
 use App\Annotations\Verifier;
+use App\Models\Item;
 use App\Models\Reference;
 use Illuminate\Console\Command;
 
@@ -20,6 +21,10 @@ class AnnotationsReverify extends Command
 
         [$verified, $rejected] = AnnotationsImport::verifyAll($this, $references, $verifier, $decomposer);
         $this->info("verified {$verified}, rejected {$rejected}");
+
+        // vocab made under an older rule (オラ "hola") that no reference links any more
+        $removed = Item::query()->where('kind', 'vocab')->doesntHave('references')->delete();
+        $this->info("Vokabeln ohne Referenz entfernt: {$removed}");
 
         return self::SUCCESS;
     }

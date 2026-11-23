@@ -44,18 +44,35 @@ trait SeedsAnnotations
             ['湊', 'みなと', [['harbour']]],
             ['綺麗', 'きれい', [['pretty']]],
             ['いや', 'いや', [['no']]],
-            ['アイドル', 'アイドル', [['performer with a cultivated image', 'Japanese idol'], ['idol', 'object of worship'], ['icon', 'star']]],
-            ['アイドル', 'アイドル', [['idle']]],
-            ['ミーム', 'ミーム', [['meme']]],
             ['桃鈴', 'ももすず', [['Momosuzu']], true],
             ['桃鈴', 'とうり', [['Touri']], true],
             ['小鳥遊', 'たかなし', [['Takanashi']], true],
         ] as $row) {
             DictWord::query()->forceCreate([
                 'spelling' => $row[0], 'reading' => $row[1], 'glosses' => $row[2], 'is_name' => $row[3] ?? false,
-                // uncommon: 海賊団, 湊, the second アイドル ("idle"), ミーム; names never
-                'common' => ! isset($row[3]) && ! in_array($row[0], ['海賊団', '湊', 'ミーム'], true) && $row[2] !== [['idle']],
+                'common' => ! isset($row[3]) && ! in_array($row[0], ['海賊団', '湊'], true), // names never
             ]);
+        }
+
+        // katakana words mirroring the real JMdict rows: [spelling, glosses, common]
+        foreach ([
+            ['アイドル', [['performer with a cultivated image', 'Japanese idol'], ['(cultural) icon', 'idol', 'star', 'object of worship']], true],
+            ['アイドル', [['idle']], false],
+            ['ライフ', [['life']], true],
+            ['ライフ', [['Raif', 'Reif'], ['Life (Japanese credit company)']], false],
+            ['パック', [['pack', 'packet', 'carton'], ['to pack', 'to package', 'to wrap'], ['face pack']], true],
+            ['パック', [['puck']], false],
+            ['オラ', [['hola']], false],
+            ['レイ', [['lei (garland of flowers)']], false],
+            ['レイ', [['lei (plural of leu)']], false],
+            ['カラカラ', [['parched', 'dried-up'], ['rattling']], false],
+            ['カラカラ', [['crested caracara']], false],
+            ['ドリンクバー', [['self-service drink area']], false],
+            ['ドリンクバー', [['self-service drink area']], false], // duplicate row of the same entry
+            ['ファンミーティング', [['fan meeting', 'fan meet', 'meet-and-greet']], false],
+            ['ギラギラ', [['glaringly', 'dazzlingly', 'blazingly']], true],
+        ] as [$spelling, $glosses, $common]) {
+            DictWord::query()->forceCreate(['spelling' => $spelling, 'reading' => $spelling, 'glosses' => $glosses, 'is_name' => false, 'common' => $common]);
         }
 
         foreach ([

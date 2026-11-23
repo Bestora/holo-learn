@@ -4,10 +4,12 @@ namespace Tests\Feature;
 
 use App\Annotations\Decomposer;
 use App\Annotations\Verifier;
+use App\Japanese\Kana;
 use App\Models\Item;
 use App\Models\Reference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class DecomposerTest extends TestCase
@@ -259,21 +261,59 @@ class DecomposerTest extends TestCase
         $this->assertSame([10, false, ['custom']], $this->level('radical', '一') + [2 => $this->item('radical', '一')->meanings]);
     }
 
-    public function test_song_katakana_dictionary_word_becomes_loanword_vocab(): void
+    /** @return array<string, array{string, ?list<string>, ?bool}> surface => expected meanings (null = no item), special */
+    public static function loanwords(): array
     {
-        $reference = $this->annotated('song', 'アイドルとミーム', 'あいどるとみーむ', [['アイドル', 'あいどる'], ['と', 'と'], ['ミーム', 'みーむ']]);
+        return [
+            'one common of two rows' => ['アイドル', ['performer with a cultivated image', 'Japanese idol', '(cultural) icon', 'idol', 'star'], false],
+            'common row only, no names' => ['ライフ', ['life'], false],
+            'common row only, no puck' => ['パック', ['pack', 'packet', 'carton', 'to pack', 'to package'], false],
+            'single common row' => ['ギラギラ', ['glaringly', 'dazzlingly', 'blazingly'], false],
+            'single uncommon row, 4+ chars' => ['ファンミーティング', ['fan meeting', 'fan meet', 'meet-and-greet'], true],
+            'duplicate rows count as one' => ['ドリンクバー', ['self-service drink area'], true],
+            'single uncommon row, 2 chars' => ['オラ', null, null],
+            'two uncommon rows' => ['レイ', null, null],
+            'two uncommon rows, 4 chars' => ['カラカラ', null, null],
+        ];
+    }
+
+    /** @param ?list<string> $meanings */
+    #[DataProvider('loanwords')]
+    public function test_song_katakana_dictionary_word_becomes_loanword_vocab(string $surface, ?array $meanings, ?bool $special): void
+    {
+        $reading = Kana::toHiragana($surface);
+        $reference = $this->annotated('song', "{$surface}と", "{$reading}と", [[$surface, $reading], ['と', 'と']]);
 
         $this->verify($reference);
 
         $this->assertSame('verified', $reference->status);
-        $this->assertSame(['vocab:アイドル@0=あいどる', 'vocab:ミーム@5=みーむ'], $this->links($reference, 'vocab'));
-        $idol = $this->item('vocab', 'アイドル');
-        $this->assertSame(['あいどる'], $idol->readings);
-        $this->assertSame(['performer with a cultivated image', 'Japanese idol', 'idol', 'object of worship', 'icon'], $idol->meanings);
-        $this->assertSame([2, false], $this->level('vocab', 'アイドル'));
-        $this->assertSame([2, true], $this->level('vocab', 'ミーム')); // not common
-        $this->assertSame(['meme'], $this->item('vocab', 'ミーム')->meanings);
-        $this->assertContains('katakana:ア@0', $this->links($reference, 'katakana'));
+        $this->assertContains('katakana:'.mb_substr($surface, 0, 1).'@0', $this->links($reference, 'katakana'));
+        if ($meanings === null) {
+            $this->assertSame([], $this->links($reference, 'vocab'));
+            $this->assertSame(0, Item::query()->where('kind', 'vocab')->count());
+
+            return;
+        }
+        $this->assertSame(["vocab:{$surface}@0={$reading}"], $this->links($reference, 'vocab'));
+        $item = $this->item('vocab', $surface);
+        $this->assertSame([$reading], $item->readings);
+        $this->assertSame($meanings, $item->meanings);
+        $this->assertSame([2, $special], $this->level('vocab', $surface));
+    }
+
+    public function test_reverify_removes_vocab_items_without_references(): void
+    {
+        $ora = $this->annotated('song', 'オラと', 'おらと', [['オラ', 'おら'], ['と', 'と']]);
+        $this->verify($this->annotated('song', 'アイドル', 'あいどる', [['アイドル', 'あいどる']]));
+        $stale = Item::query()->create(['kind' => 'vocab', 'characters' => 'オラ', 'readings' => ['おら'], 'meanings' => ['hola'], 'level' => 2]);
+        $stale->references()->attach($ora->id, ['position' => 0, 'context_reading' => 'おら']); // linked under an older rule
+        Item::query()->create(['kind' => 'kanji', 'characters' => '湊', 'readings' => [], 'meanings' => []]);
+
+        $this->artisan('annotations:reverify')->expectsOutputToContain('Vokabeln ohne Referenz entfernt: 1')->assertSuccessful();
+
+        $this->assertFalse(Item::query()->where(['kind' => 'vocab', 'characters' => 'オラ'])->exists());
+        $this->assertTrue(Item::query()->where(['kind' => 'vocab', 'characters' => 'アイドル'])->exists());
+        $this->assertTrue(Item::query()->where(['kind' => 'kanji', 'characters' => '湊'])->exists()); // only vocab is removed
     }
 
     public function test_kana_words_outside_the_rule_create_no_vocab(): void
