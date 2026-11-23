@@ -9,7 +9,7 @@ use Normalizer;
  * Checks a song title's reading against its romaji by aligning the annotation words with the
  * alt's tokens, in order, nothing left over on either side:
  * - a Latin word consumes the next token if it equals its surface, else none (never compared);
- * - a katakana word may consume 1–3 tokens unchecked (the English spelling of a loanword;
+ * - a katakana word may consume one token unchecked (the English spelling of a loanword;
  *   its reading is already tied to its surface by kana_mismatch);
  * - every other word must lie in a run of non-Latin words whose joined reading matches
  *   1–6 joined tokens as romaji. Pure, no database.
@@ -17,8 +17,6 @@ use Normalizer;
 class SongRomaji
 {
     private const MAX_RUN_TOKENS = 6;
-
-    private const MAX_WILDCARD = 3;
 
     /**
      * @param  list<array{surface: string, reading: string}>  $words
@@ -143,12 +141,9 @@ class SongRomaji
             return $memo[$key] = self::aligns($words, $tokens, $i + 1, $t + ($equal ? 1 : 0), $memo);
         }
 
-        if ($word['class'] === 'K') {
-            for ($b = 1; $b <= self::MAX_WILDCARD && $t + $b <= $m; $b++) {
-                if (self::aligns($words, $tokens, $i + 1, $t + $b, $memo)) {
-                    return $memo[$key] = true;
-                }
-            }
+        // exactly one token: more would let it eat the first token of a split kanji word
+        if ($word['class'] === 'K' && $t < $m && self::aligns($words, $tokens, $i + 1, $t + 1, $memo)) {
+            return $memo[$key] = true;
         }
 
         $reading = $spoken = '';

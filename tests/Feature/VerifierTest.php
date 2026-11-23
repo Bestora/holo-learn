@@ -438,14 +438,16 @@ class VerifierTest extends TestCase
         $rejected = ['romaji_mismatch'];
 
         return [
-            // katakana words may stand for their English spelling (1–3 tokens)
+            // katakana words may stand for their English spelling (one token)
             'hatsukoi cider' => ['初恋サイダー', 'Hatsukoi Cider', [['初恋', 'はつこい'], ['サイダー', 'さいだー']], []],
             'renai circulation' => ['恋愛サーキュレーション', 'Renai Circulation', [['恋愛', 'れんあい'], ['サーキュレーション', 'さーきゅれーしょん']], []],
             'pride kakumei' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくめい']], []],
             'zettai idol' => ['絶対アイドル辞めないで', 'Zettai idol yamenaide', [['絶対', 'ぜったい'], ['アイドル', 'あいどる'], ['辞めないで', 'やめないで']], []],
             'moonlight densetsu' => ['ムーンライト伝説', 'Moonlight Densetsu', [['ムーンライト', 'むーんらいと'], ['伝説', 'でんせつ']], []],
             'pokemon master' => ['めざせポケモンマスター', 'Mezase Pokemon Master', [['めざせ', 'めざせ'], ['ポケモン', 'ぽけもん'], ['マスター', 'ますたー']], []],
-            'katakana word over two tokens' => ['ヨドバシカメラの歌', 'Yodobashi Camera no Uta', [['ヨドバシカメラ', 'よどばしかめら'], ['の', 'の'], ['歌', 'うた']], []],
+            'katakana words, one token each' => ['ヨドバシカメラの歌', 'Yodobashi Camera no Uta', [['ヨドバシ', 'よどばし'], ['カメラ', 'かめら'], ['の', 'の'], ['歌', 'うた']], []],
+            // a wildcard takes exactly one token; Camera is no romaji
+            'katakana word over two tokens' => ['ヨドバシカメラの歌', 'Yodobashi Camera no Uta', [['ヨドバシカメラ', 'よどばしかめら'], ['の', 'の'], ['歌', 'うた']], $rejected],
             'latin word at the end' => ['花咲く☆最強レジェンドDays', 'Hanasaku Saikyou Legend DAYS', [['花咲く', 'はなさく'], ['最強', 'さいきょう'], ['レジェンド', 'れじぇんど'], ['Days', 'でいず']], []],
             'latin word absent from alt' => ['コングラッCHU☆マーチ', 'Congrachu☆march', [['コングラッ', 'こんぐらっ'], ['CHU', 'ちゅう'], ['マーチ', 'まーち']], []],
             'tetoris' => ['テトリス', 'Tetoris', [['テトリス', 'てとりす']], []],
@@ -460,9 +462,9 @@ class VerifierTest extends TestCase
             'token-final n stays n' => ['金色', 'Kin Iro', [['金色', 'きんいろ']], []],
             // ponytail: known ceiling: romaji n before a vowel is ambiguous, so ん+vowel matches na-row romaji
             'n before vowel is ambiguous' => ['奏', 'Kanade', [['奏', 'かんあで']], []],
-            // ponytail: known ceiling: a wildcard may take the first token of a kanji word romanized over
-            // two tokens, so a reading matching only the rest passes (the dictionary still keeps it untaught)
-            'wildcard takes part of a split kanji word' => ['サイダー初恋', 'Saida Hatsu Koi', [['サイダー', 'さいだー'], ['初恋', 'こい']], []],
+            // a wildcard takes one token only, so it cannot eat the first token of a split kanji word
+            'wildcard takes part of a split kanji word' => ['サイダー初恋', 'Saida Hatsu Koi', [['サイダー', 'さいだー'], ['初恋', 'こい']], $rejected],
+            'split kanji word after a wildcard' => ['サイダー初恋', 'Cider Hatsu Koi', [['サイダー', 'さいだー'], ['初恋', 'はつこい']], []],
             'translation is no romaji' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], [], 'translation'],
             // a kanji word must always be matched by romaji tokens
             'kakumei wrong' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくべい']], $rejected],
