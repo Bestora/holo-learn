@@ -48,9 +48,14 @@ class Kana
         'va' => 'ゔぁ', 'vi' => 'ゔぃ', 'vu' => 'ゔ', 've' => 'ゔぇ', 'vo' => 'ゔぉ',
     ];
 
-    /** Kana that only appear in the toRomaji() direction. */
+    /**
+     * toRomaji()-only spellings; they override the inverted ROMAJI table
+     * (づ→zu, not dzu; てぃ→ti although fromRomaji('ti') is ち).
+     */
     private const EXTRA_KANA = [
-        'ぢ' => 'ji', 'ゐ' => 'i', 'ゑ' => 'e',
+        'づ' => 'zu', 'ぢ' => 'ji', 'ゐ' => 'i', 'ゑ' => 'e',
+        'てぃ' => 'ti', 'とぅ' => 'tu', 'でゅ' => 'dyu', 'どぅ' => 'du', 'てゅ' => 'tyu', 'ふゅ' => 'fyu',
+        'うぉ' => 'wo', 'いぇ' => 'ye', 'つぁ' => 'tsa', 'つぃ' => 'tsi', 'つぇ' => 'tse', 'つぉ' => 'tso',
         'ぁ' => 'a', 'ぃ' => 'i', 'ぅ' => 'u', 'ぇ' => 'e', 'ぉ' => 'o',
         'ゃ' => 'ya', 'ゅ' => 'yu', 'ょ' => 'yo', 'ゎ' => 'wa', 'ゕ' => 'ka', 'ゖ' => 'ke',
     ];
@@ -76,8 +81,9 @@ class Kana
     public static function fromRomaji(string $romaji): string
     {
         $s = strtr(mb_strtolower($romaji), self::MACRONS);
-        // n' and n before a word boundary are always ん; then drop non-letters.
-        $s = preg_replace("/n['’]|n(?=[^\\p{L}]|$)/u", 'ん', $s);
+        // IME-style nn (not before a vowel/y), n' and n before a word boundary
+        // are always ん; then drop non-letters.
+        $s = preg_replace("/nn(?![aiueoy])|n['’]|n(?=[^\\p{L}]|$)/u", 'ん', $s);
         $s = preg_replace('/[^\p{L}]+/u', '', $s);
 
         $chars = mb_str_split($s);
@@ -120,7 +126,7 @@ class Kana
     public static function toRomaji(string $kana): string
     {
         static $map = null;
-        $map ??= array_flip(array_reverse(self::ROMAJI)) + self::EXTRA_KANA;
+        $map ??= self::EXTRA_KANA + array_flip(array_reverse(self::ROMAJI));
 
         $chars = mb_str_split(self::toHiragana($kana));
         $count = count($chars);
@@ -186,7 +192,7 @@ class Kana
     /** Comparison form only, never for display: long vowels collapsed. */
     public static function loose(string $text): string
     {
-        $s = preg_replace('/[\s・ー]+/u', '', self::toHiragana($text));
+        $s = strtr(preg_replace('/[\s・ー]+/u', '', self::toHiragana($text)), ['づ' => 'ず', 'ぢ' => 'じ']);
 
         // ponytail: collapses by vowel row (こう→こ, せい→せ, きゅう→きゅ), a superset of the
         // brief's literal おう/おお/えい/うう/ゅう/ょう. Narrow to literals if too lenient.

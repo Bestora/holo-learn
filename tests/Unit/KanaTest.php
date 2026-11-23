@@ -45,6 +45,16 @@ class KanaTest extends TestCase
             ['ヴァイオレット', 'vaioretto'],
             ['ねね  ・ 　ぺこら', 'nene pekora'],
             ['桃鈴ねね!', '桃鈴nene!'],
+            // fix round 1: loanword small kana, づ/ぢ
+            ['パーティー', 'paatii'],
+            ['ティ', 'ti'],
+            ['トゥ', 'tu'],
+            ['ウォッチ', 'wotchi'],
+            ['デュエット', 'dyuetto'],
+            ['ツァ', 'tsa'],
+            ['つづく', 'tsuzuku'],
+            ['気づく', '気zuku'],
+            ['ちぢむ', 'chijimu'],
             ['', ''],
         ];
     }
@@ -78,6 +88,12 @@ class KanaTest extends TestCase
             ['va vi vu ve vo', 'ゔぁゔぃゔゔぇゔぉ'],
             ['Ridin\' on Dreams', 'りでぃんおんdれあms'],
             ['qxl', 'qxl'],
+            // fix round 1: IME-style nn
+            ['kann', 'かん'],
+            ['konnichiha', 'こんにちは'],
+            ['konnnichiha', 'こんにちは'],
+            ['annai', 'あんない'],
+            ['nn', 'ん'],
             ['Kyu-123-Ku!', 'きゅく'],
             ['', ''],
         ];
@@ -103,6 +119,8 @@ class KanaTest extends TestCase
         $this->assertTrue(Kana::looselyEqual(Kana::fromRomaji('Tokyo'), 'とうきょう'));
         $this->assertFalse(Kana::looselyEqual(Kana::fromRomaji('qxl'), 'くぇ'));
         $this->assertTrue(Kana::looselyEqual('', ''));
+        $this->assertTrue(Kana::looselyEqual(Kana::fromRomaji('tsuzuku'), 'つづく'));
+        $this->assertTrue(Kana::looselyEqual(Kana::fromRomaji('chijimu'), 'ちぢむ'));
     }
 
     public function test_character_classes(): void
