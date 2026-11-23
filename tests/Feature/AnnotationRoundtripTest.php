@@ -7,6 +7,7 @@ use App\Models\Annotation;
 use App\Models\Occurrence;
 use App\Models\Reference;
 use App\Models\Talent;
+use Database\Seeders\KanaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
@@ -183,6 +184,10 @@ class AnnotationRoundtripTest extends TestCase
             'word as list' => [['words' => [['花', 'はな']]]],
             'surface as int' => [['words' => [['surface' => 1, 'reading' => 'はな']]]],
             'alt_kind true' => [['alt_kind' => true]],
+            'lemma without lemma_reading' => [['words' => [['surface' => '歌った', 'reading' => 'うたった', 'lemma' => '歌う']]]],
+            'lemma_reading without lemma' => [['words' => [['surface' => '歌った', 'reading' => 'うたった', 'lemma_reading' => 'うたう']]]],
+            'lemma_reading with kanji' => [['words' => [['surface' => '歌った', 'reading' => 'うたった', 'lemma' => '歌う', 'lemma_reading' => '歌う']]]],
+            'lemma as int' => [['words' => [['surface' => '歌った', 'reading' => 'うたった', 'lemma' => 1, 'lemma_reading' => 'うたう']]]],
             'invalid utf-8' => ['{"key":"song:'.str_repeat('0', 40).'","reading":"は'."\xff".'な","meaning":"m","alt_kind":"none","model":"m","words":[{"surface":"花","reading":"はな"}]}'],
         ];
     }
@@ -229,6 +234,56 @@ class AnnotationRoundtripTest extends TestCase
 
         $this->assertSame('ふわわあびすがーど', $parsed['reading'] ?? null);
         $this->assertSame(['ふわわ', 'あびすがーど'], array_column($parsed['words'] ?? [], 'reading'));
+    }
+
+    public function test_parse_line_keeps_lemma(): void
+    {
+        $line = $this->line(new Reference(['kind' => 'song', 'text_key' => str_repeat('0', 40)]), ['reading' => 'うたった', 'words' => [
+            ['surface' => '歌った', 'reading' => 'ウタッタ', 'lemma' => ' 歌う ', 'lemma_reading' => 'ウタ・ウ'],
+        ]]);
+
+        $this->assertSame(
+            [['surface' => '歌った', 'reading' => 'うたった', 'lemma' => '歌う', 'lemma_reading' => 'うたう']],
+            app(Importer::class)->parseLine($line)['words'] ?? null,
+        );
+    }
+
+    public function test_import_verifies_and_reports_rejected(): void
+    {
+        $talent = $this->talent(1);
+        $this->seed(KanaSeeder::class);
+        $good = $this->reference('song', '花に亡霊', $talent);
+        $bad = $this->reference('song', '花を', $talent);
+        File::put("{$this->dir}/a.jsonl", $this->line($good)."\n".$this->line($bad, [
+            'reading' => 'はなと', 'words' => [['surface' => '花', 'reading' => 'はな'], ['surface' => 'を', 'reading' => 'と']],
+        ])."\n");
+
+        $out = $this->import($this->dir, '-v');
+
+        $this->assertStringContainsString('imported 2, skipped 0, verified 1, rejected 1', $out);
+        $this->assertStringContainsString("song:{$bad->text_key} 花を: kana_mismatch", $out);
+        $this->assertStringNotContainsString($good->text_key, $out);
+        $this->assertSame('verified', $good->refresh()->status);
+        $this->assertSame('rejected', $bad->refresh()->status);
+        $this->assertSame(1, $good->items()->count()); // only に: no dictionary rows in this test
+    }
+
+    public function test_reverify_reapplies_rules_to_annotated_references(): void
+    {
+        $talent = $this->talent(1);
+        $this->seed(KanaSeeder::class);
+        $good = $this->reference('song', '花に亡霊', $talent);
+        $this->reference('song', '歌B', $talent);
+        File::put("{$this->dir}/a.jsonl", $this->line($good)."\n");
+        $this->import($this->dir);
+        $good->update(['status' => 'rejected']);
+        $good->items()->detach();
+
+        $this->assertSame(0, Artisan::call('annotations:reverify'));
+
+        $this->assertStringContainsString('verified 1, rejected 0', Artisan::output());
+        $this->assertSame('verified', $good->refresh()->status);
+        $this->assertSame(1, $good->items()->count());
     }
 
     public function test_import_accepts_bom_and_crlf(): void
@@ -279,8 +334,8 @@ class AnnotationRoundtripTest extends TestCase
         $this->assertStringContainsString('a.jsonl:6: alt_kind muss romaji, translation oder none sein', $out);
         $this->assertStringNotContainsString('a.jsonl:7', $out);
         $this->assertStringNotContainsString('b.jsonl', $out);
-        $this->assertSame('annotated', $a->refresh()->status);
-        $this->assertSame('annotated', $b->refresh()->status);
+        $this->assertSame('verified', $a->refresh()->status);
+        $this->assertSame('rejected', $b->refresh()->status);  // its words spell 花に亡霊
         $this->assertSame(2, Annotation::query()->count());
     }
 
@@ -296,7 +351,7 @@ class AnnotationRoundtripTest extends TestCase
 
         $this->assertStringContainsString('imported 2, skipped 0', $this->import($this->dir));
 
-        $this->assertSame('annotated', $reference->refresh()->status);
+        $this->assertSame('verified', $reference->refresh()->status);
         $this->assertSame('second', $reference->annotation?->meaning_en);
         $this->assertNull($reference->annotation?->check_errors);
         $this->assertSame(1, Annotation::query()->count());
@@ -356,15 +411,16 @@ class AnnotationRoundtripTest extends TestCase
         foreach ($exported as $e) {
             [$kind, $textKey] = explode(':', $e['key']);
             $reference = Reference::query()->where(['kind' => $kind, 'text_key' => $textKey])->sole();
-            $this->assertSame('annotated', $reference->status);
+            // the dummy reading fails the kana and romaji checks; the kanji title word only loses ok
+            $this->assertSame($e['text'] === '花に亡霊' ? 'verified' : 'rejected', $reference->status);
             $this->assertSame("meaning of {$e['text']}", $reference->annotation?->meaning_en);
-            $this->assertSame([['surface' => $e['text'], 'reading' => 'てすと']], $reference->annotation->words);
+            $this->assertSame([['surface' => $e['text'], 'reading' => 'てすと', 'ok' => false]], $reference->annotation->words);
         }
         $this->assertSame([], $this->export());
 
         $before = Annotation::query()->orderBy('id')->get()->toArray();
         $this->import($this->dir);
         $this->assertSame($before, Annotation::query()->orderBy('id')->get()->toArray());
-        $this->assertSame(3, Reference::query()->where('status', 'annotated')->count());
+        $this->assertSame(['いのち' => 'rejected', '兎田ぺこら' => 'rejected', '花に亡霊' => 'verified'], Reference::query()->orderBy('text_ja')->pluck('status', 'text_ja')->all());
     }
 }

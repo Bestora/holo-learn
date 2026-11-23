@@ -2,7 +2,10 @@
 
 namespace App\Console\Commands;
 
+use App\Annotations\Decomposer;
 use App\Annotations\Importer;
+use App\Annotations\Verifier;
+use App\Models\Reference;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 
@@ -12,7 +15,7 @@ class AnnotationsImport extends Command
 
     protected $description = 'Liest Annotationszeilen (JSONL) ein und setzt die Referenzen auf annotated';
 
-    public function handle(Importer $importer): int
+    public function handle(Importer $importer, Verifier $verifier, Decomposer $decomposer): int
     {
         $path = $this->argument('path');
         if (! str_starts_with($path, '/')) {
@@ -31,6 +34,7 @@ class AnnotationsImport extends Command
         }
 
         $imported = $skipped = 0;
+        $references = [];
         foreach ($files as $file) {
             foreach (File::lines($file) as $index => $line) {
                 if ($index === 0) {
@@ -47,11 +51,38 @@ class AnnotationsImport extends Command
                     continue;
                 }
                 $imported++;
+                $references[$result->id] = $result;
             }
         }
 
-        $this->info("imported {$imported}, skipped {$skipped}");
+        // after all files, so a later line for the same key still replaces an earlier one
+        [$verified, $rejected] = self::verifyAll($this, $references, $verifier, $decomposer);
+        $this->info("imported {$imported}, skipped {$skipped}, verified {$verified}, rejected {$rejected}");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Verifies and decomposes each reference; with -v prints one line per rejected one.
+     *
+     * @param  iterable<Reference>  $references
+     * @return array{int, int} verified, rejected
+     */
+    public static function verifyAll(Command $command, iterable $references, Verifier $verifier, Decomposer $decomposer): array
+    {
+        $verified = $rejected = 0;
+        foreach ($references as $reference) {
+            $errors = $verifier->verify($reference);
+            $decomposer->decompose($reference);
+            if ($errors === []) {
+                $verified++;
+
+                continue;
+            }
+            $rejected++;
+            $command->line("{$reference->kind}:{$reference->text_key} {$reference->text_ja}: ".implode(', ', $errors), verbosity: 'v');
+        }
+
+        return [$verified, $rejected];
     }
 }

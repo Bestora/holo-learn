@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $reference_id
  * @property string $reading_kana hiragana
  * @property string $meaning_en
- * @property list<array{surface: string, reading: string}> $words
+ * @property list<array{surface: string, reading: string, lemma?: string, lemma_reading?: string, ok?: bool}> $words
  * @property string $alt_kind romaji|translation|none
  * @property string $model
  * @property ?array<mixed> $check_errors

@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 /**
  * Reads annotation lines (JSONL, written by AI agents) into the annotations table.
  *
- * @phpstan-type ParsedLine array{key: string, kind: string, text_key: string, reading: string, meaning: string, alt_kind: string, model: string, words: list<array{surface: string, reading: string}>}
+ * @phpstan-type ParsedLine array{key: string, kind: string, text_key: string, reading: string, meaning: string, alt_kind: string, model: string, words: list<array{surface: string, reading: string, lemma?: string, lemma_reading?: string}>}
  */
 class Importer
 {
@@ -120,7 +120,17 @@ class Importer
             if ($surface === null || $wordReading === null) {
                 return 'words['.$i.'] braucht surface und ein reading aus Kana';
             }
-            $parsedWords[] = ['surface' => $surface, 'reading' => $wordReading];
+            $parsed = ['surface' => $surface, 'reading' => $wordReading];
+            // optional dictionary form of a conjugated word: both or neither
+            if (isset($word['lemma']) || isset($word['lemma_reading'])) {
+                $lemma = $this->text($word['lemma'] ?? null, PHP_INT_MAX);
+                $lemmaReading = $this->kana($word['lemma_reading'] ?? null);
+                if ($lemma === null || $lemmaReading === null) {
+                    return 'words['.$i.']: lemma und lemma_reading (Kana) nur zusammen';
+                }
+                $parsed += ['lemma' => $lemma, 'lemma_reading' => $lemmaReading];
+            }
+            $parsedWords[] = $parsed;
         }
 
         return [
