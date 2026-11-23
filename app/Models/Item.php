@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
  * @property int $id
@@ -23,5 +24,11 @@ class Item extends Model
             'readings' => 'array',
             'meanings' => 'array',
         ];
+    }
+
+    /** @return BelongsToMany<Reference, $this> */
+    public function references(): BelongsToMany
+    {
+        return $this->belongsToMany(Reference::class)->withPivot('position', 'context_reading');
     }
 }
