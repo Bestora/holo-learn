@@ -28,6 +28,17 @@ class TextCleanerTest extends TestCase
         $this->assertNull(TextCleaner::talentName('', ''));
     }
 
+    public function test_talent_name_live_channel_names(): void
+    {
+        // a trailing チャンネル/ちゃんねる is no part of the name
+        $this->assertSame('ときのそら', TextCleaner::talentName('SoraCh. ときのそらチャンネル', 'Tokino Sora'));
+        $this->assertSame('夜空メル', TextCleaner::talentName('Mel Channel 夜空メルチャンネル', 'Yozora Mel'));
+        $this->assertSame('みこ', TextCleaner::talentName('みこちゃんねる', 'Miko'));
+        // runs containing ホロライブ are agency labels, not names
+        $this->assertSame('アキロゼ', TextCleaner::talentName('アキロゼCh。Vtuber/ホロライブ所属', 'Aki Rosenthal'));
+        $this->assertNull(TextCleaner::talentName('ホロライブ公式', 'hololive'));
+    }
+
     public function test_song_name_brief_cases(): void
     {
         $this->assertSame(['text_ja' => '花に亡霊', 'alt' => 'Ghost In A Flower'], TextCleaner::songName('花に亡霊 / Ghost In A Flower'));

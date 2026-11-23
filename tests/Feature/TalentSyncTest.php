@@ -98,6 +98,27 @@ class TalentSyncTest extends TestCase
         $this->assertSame('https://img/new', $talent->photo_url);
     }
 
+    public function test_changed_name_moves_occurrence_and_drops_orphaned_new_reference(): void
+    {
+        Http::fake(['*' => Http::sequence()
+            ->push([$this->channel(self::NENE, 'Nene Ch.ねねちゃんねる', 'Momosuzu Nene'), $this->channel('UCother', 'Other Ch. 他人', 'Other')])
+            ->push([$this->channel(self::NENE, 'Nene Ch.ねねち', 'Momosuzu Nene'), $this->channel('UCother', 'Other Ch. 他人さん', 'Other')])
+            ->push([$this->channel(self::NENE, 'Nene Ch.桃鈴ねね', 'Momosuzu Nene'), $this->channel('UCother', 'Other Ch. 他人さん', 'Other')])]);
+
+        $this->sync();
+        $occurrence = Occurrence::query()->where('source_id', 'name:'.self::NENE)->sole();
+        Reference::query()->where('text_ja', '他人')->update(['status' => 'annotated']);
+
+        $this->sync();
+        $this->sync();
+
+        $this->assertSame($occurrence->id, Occurrence::query()->where('source_id', 'name:'.self::NENE)->sole()->id);
+        $this->assertSame('桃鈴ねね', $occurrence->fresh()?->reference?->text_ja);
+        // orphaned "new" references are gone, annotated work is kept
+        $this->assertEqualsCanonicalizing(['桃鈴ねね', '他人', '他人さん'], Reference::query()->pluck('text_ja')->all());
+        $this->assertSame(2, Occurrence::count());
+    }
+
     public function test_japanese_channel_name_creates_name_reference(): void
     {
         $this->fakePages([[$this->channel(self::NENE, 'Nene Ch.桃鈴ねね', 'Momosuzu Nene')]]);
@@ -132,6 +153,19 @@ class TalentSyncTest extends TestCase
         $this->assertSame('星街すいせい', Talent::sole()->name_ja);
         $this->assertSame('星街すいせい', Reference::sole()->text_ja);
         $this->assertSame('name:'.self::SUISEI, Occurrence::sole()->source_id);
+    }
+
+    public function test_configured_overrides(): void
+    {
+        $this->fakePages([[
+            $this->channel('UCFTLzh12_nrtzqBPsTCqenA', 'アキロゼCh。Vtuber/ホロライブ所属', 'Aki Rosenthal', '1st Generation'),
+            $this->channel('UCKMWFR6lAstLa7Vbf5dH7ig', 'Chihaya Ch. 輪堂 千速 - FLOW GLOW', 'Rindo Chihaya', 'FLOW GLOW'),
+            $this->channel('UCDqI2jOz0weumE8s7paEk6g', 'Roboco Ch. - ロボ子', 'Robocosan', '0th Generation'),
+        ]]);
+
+        $this->sync();
+
+        $this->assertEqualsCanonicalizing(['アキ・ローゼンタール', '輪堂千速', 'ロボ子さん'], Reference::query()->pluck('text_ja')->all());
     }
 
     public function test_channel_without_japanese_is_main_talent_without_name_reference(): void

@@ -66,12 +66,23 @@ class TalentSync
             'priority' => is_int($position) ? $position + 1 : null,
         ]);
 
-        if ($nameJa !== null) {
+        $occurrence = Occurrence::query()->with('reference')->firstWhere('source_id', "name:{$id}");
+        $previous = $occurrence?->reference;
+
+        if ($nameJa === null) {
+            $occurrence?->delete();
+        } else {
             $reference = Reference::firstOrCreateFor('name', $nameJa, $english);
-            Occurrence::query()->firstOrCreate(
+            Occurrence::query()->updateOrCreate(
                 ['source_id' => "name:{$id}"],
                 ['reference_id' => $reference->id, 'talent_id' => $talent->id],
             );
+        }
+
+        // Renamed talent: drop the old name reference if it is unannotated and nothing points at it.
+        if ($previous !== null && $previous->text_ja !== $nameJa
+            && $previous->status === 'new' && ! $previous->occurrences()->exists()) {
+            $previous->delete();
         }
     }
 }

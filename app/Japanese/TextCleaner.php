@@ -10,17 +10,19 @@ class TextCleaner
     /**
      * Longest Japanese run before the first spaced dash, e.g.
      * "Laplus ch. ラプラス・ダークネス - holoX -" → "ラプラス・ダークネス".
+     * A trailing チャンネル/ちゃんねる is dropped; runs containing ホロライブ
+     * ("ホロライブ所属") are agency labels and ignored.
      * $englishName is reserved for disambiguation and is currently unused.
      */
     public static function talentName(string $channelName, string $englishName): ?string
     {
-        $head = preg_split('/\s[-‐‑‒–—―]\s/u', $channelName, 2)[0];
+        $head = (preg_split('/\s[-‐‑‒–—―]\s/u', $channelName, 2) ?: [$channelName])[0];
         preg_match_all('/['.Kana::KANA.Kana::KANJI.'々・]+/u', $head, $m);
 
         $best = null;
         foreach ($m[0] as $run) {
-            $run = mb_trim($run, '・');
-            if (Kana::hasJapanese($run) && mb_strlen($run) > mb_strlen($best ?? '')) {
+            $run = mb_trim(preg_replace('/(チャンネル|ちゃんねる)$/u', '', $run) ?? $run, '・');
+            if (! str_contains($run, 'ホロライブ') && Kana::hasJapanese($run) && mb_strlen($run) > mb_strlen($best ?? '')) {
                 $best = $run;
             }
         }
@@ -35,7 +37,7 @@ class TextCleaner
      */
     public static function songName(string $name): array
     {
-        $segments = array_map(self::stripTrailingGroups(...), preg_split('/\s+\/\s+/u', mb_trim($name)));
+        $segments = array_map(self::stripTrailingGroups(...), preg_split('/\s+\/\s+/u', mb_trim($name)) ?: [mb_trim($name)]);
 
         $ja = null;
         foreach ($segments as $index => $segment) {

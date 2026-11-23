@@ -218,7 +218,11 @@ class Kana
         return preg_match('/['.self::KANA.self::KANJI.'々]/u', $text) === 1;
     }
 
-    /** Kanji in order of appearance, duplicates kept, 々 excluded. */
+    /**
+     * Kanji in order of appearance, duplicates kept, 々 excluded.
+     *
+     * @return list<string>
+     */
     public static function kanjiIn(string $text): array
     {
         preg_match_all('/['.self::KANJI.']/u', $text, $m);

@@ -37,7 +37,10 @@ return [
 
     // Japanese name for channels whose name carries none.
     'name_overrides' => [
-        'UC5CwaMl1eIgY8h02uZw7u8A' => '星街すいせい', // channel is just "Suisei Channel"
+        'UC5CwaMl1eIgY8h02uZw7u8A' => '星街すいせい', // Hoshimachi Suisei ("Suisei Channel")
+        'UCFTLzh12_nrtzqBPsTCqenA' => 'アキ・ローゼンタール', // Aki Rosenthal ("アキロゼCh。Vtuber/ホロライブ所属")
+        'UCKMWFR6lAstLa7Vbf5dH7ig' => '輪堂千速', // Rindo Chihaya ("Chihaya Ch. 輪堂 千速 - FLOW GLOW")
+        'UCDqI2jOz0weumE8s7paEk6g' => 'ロボ子さん', // Robocosan ("Roboco Ch. - ロボ子")
     ],
 
     'min_references' => 3,
