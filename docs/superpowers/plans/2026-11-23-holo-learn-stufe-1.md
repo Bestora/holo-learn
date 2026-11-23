@@ -492,7 +492,14 @@ Duolingo-artig, Spezial nur als Bonus):
     kanji    10 + (5 − JLPT)  [N5 → 10 … N1 → 14]; ohne JLPT: 20 + Schulstufe;
              ohne beides: 40 und is_special = true
     vocab    Stufe des höchsten enthaltenen Kanji; +0 wenn JMdict „häufig“,
-             sonst is_special = true (reine Kana-Wörter gibt es als Item nicht)
+             sonst is_special = true
+    Lehnwort (neu, ändert Regel 10 aus Aufgabe 7): ein geprüftes Wort (ok),
+             dessen Oberfläche nur aus Katakana/ー besteht, ≥ 2 Zeichen hat und
+             als DictWord(spelling = Oberfläche, is_name = false) existiert,
+             wird Item(vocab) – nur bei kind=song; level 2 wenn „häufig“,
+             sonst 2 und is_special = true; readings = [Hiragana-Lesung],
+             meanings = Glossen (erste 5). Abgefragt wird die Bedeutung;
+             Hiragana-Wörter bleiben ohne Vokabel-Item.
     radical  Stufe des niedrigsten Kanji, das es enthält (kommt mit diesem
              Kanji, nie davor); ohne Bedeutung: nie anbieten
   Dafür: dict_kanji um jlpt, grade, frequency erweitern, dict_words um common

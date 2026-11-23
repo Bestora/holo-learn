@@ -368,6 +368,14 @@ Umsetzung (Vorschlag des Entwurfs):
   innerhalb einer Lektion erscheint keine Referenz zweimal.
 - Radikale kommen erst zusammen mit dem ersten Kanji, das sie enthält, nicht
   als eigener Block davor.
+- **Katakana-Lehnwörter** (Wunsch des Auftraggebers: „Katakana → Englisch ist
+  auch interessant“): Ein reines Katakana-Wort aus einem Songtitel, das im
+  Wörterbuch steht (アイドル = idol, ミーム = meme), wird eine eigene Vokabel.
+  Abgefragt wird die englische Bedeutung; die Lesung übt dabei das
+  Katakana-Lesen. Diese Vokabeln kommen direkt nach den Katakana, vor den
+  Kanji. Bei Talent-Namen in Katakana zeigt die Auflösung den Namen in
+  lateinischer Schrift daneben (ハコス・ベールズ ↔ Hakos Baelz); eine eigene
+  Vokabel entsteht daraus nicht.
 
 ## Betrieb (vom Auftraggeber vorgegeben)
 
