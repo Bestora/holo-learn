@@ -33,6 +33,9 @@ class AnnotationsImport extends Command
         $imported = $skipped = 0;
         foreach ($files as $file) {
             foreach (File::lines($file) as $index => $line) {
+                if ($index === 0) {
+                    $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line; // UTF-8 BOM
+                }
                 if (trim($line) === '') {
                     continue;
                 }

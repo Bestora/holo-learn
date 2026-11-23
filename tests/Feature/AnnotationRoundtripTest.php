@@ -10,6 +10,7 @@ use App\Models\Talent;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
@@ -175,6 +176,14 @@ class AnnotationRoundtripTest extends TestCase
             'words not a list' => [['words' => ['a' => ['surface' => '花', 'reading' => 'はな']]]],
             'word without surface' => [['words' => [['reading' => 'はな']]]],
             'word reading with kanji' => [['words' => [['surface' => '花', 'reading' => '花']]]],
+            'key with trailing newline' => [['key' => 'song:'.str_repeat('0', 40)."\n"]],
+            'reading as int' => [['reading' => 5]],
+            'meaning as array' => [['meaning' => ['a']]],
+            'words with null' => [['words' => [null]]],
+            'word as list' => [['words' => [['花', 'はな']]]],
+            'surface as int' => [['words' => [['surface' => 1, 'reading' => 'はな']]]],
+            'alt_kind true' => [['alt_kind' => true]],
+            'invalid utf-8' => ['{"key":"song:'.str_repeat('0', 40).'","reading":"は'."\xff".'な","meaning":"m","alt_kind":"none","model":"m","words":[{"surface":"花","reading":"はな"}]}'],
         ];
     }
 
@@ -209,6 +218,38 @@ class AnnotationRoundtripTest extends TestCase
         ], $importer->parseLine($line));
     }
 
+    public function test_reading_separators_are_removed(): void
+    {
+        $line = json_encode([
+            'key' => 'name:'.str_repeat('ab', 20), 'reading' => 'ふわわ・あびすがーど', 'meaning' => 'Fuwawa', 'alt_kind' => 'romaji', 'model' => 'haiku',
+            'words' => [['surface' => 'フワワ', 'reading' => 'ふわわ '], ['surface' => '・アビスガード', 'reading' => '・あびす　がーど']],
+        ], JSON_UNESCAPED_UNICODE);
+
+        $parsed = app(Importer::class)->parseLine($line);
+
+        $this->assertSame('ふわわあびすがーど', $parsed['reading'] ?? null);
+        $this->assertSame(['ふわわ', 'あびすがーど'], array_column($parsed['words'] ?? [], 'reading'));
+    }
+
+    public function test_import_accepts_bom_and_crlf(): void
+    {
+        $talent = $this->talent(1);
+        $a = $this->reference('song', '花に亡霊', $talent);
+        $b = $this->reference('song', '歌B', $talent);
+        File::put("{$this->dir}/bom.jsonl", "\xEF\xBB\xBF".$this->line($a)."\r\n".$this->line($b)."\r\n");
+
+        $this->assertStringContainsString('imported 2, skipped 0', $this->import($this->dir));
+    }
+
+    public function test_reference_lookups_are_indexed(): void
+    {
+        $indexed = fn (string $table) => array_column(Schema::getIndexes($table), 'columns');
+
+        $this->assertContains(['reference_id'], $indexed('occurrences'));
+        $this->assertContains(['talent_id'], $indexed('occurrences'));
+        $this->assertContains(['reference_id'], $indexed('item_reference'));
+    }
+
     public function test_import_skips_bad_lines_without_aborting(): void
     {
         $talent = $this->talent(1);
@@ -230,10 +271,14 @@ class AnnotationRoundtripTest extends TestCase
         $out = $this->import($this->dir, '-v');
 
         $this->assertStringContainsString('imported 2, skipped 5', $out);
-        $this->assertStringContainsString('a.jsonl:1', $out);
-        $this->assertStringContainsString('a.jsonl:2', $out);
+        $this->assertStringContainsString('a.jsonl:1: kein gültiges JSON-Objekt', $out);
+        $this->assertStringContainsString('a.jsonl:2: unbekannter key', $out);
         $this->assertStringNotContainsString('a.jsonl:3', $out);
-        $this->assertStringContainsString('a.jsonl:6', $out);
+        $this->assertStringContainsString('a.jsonl:4: reading fehlt oder enthält Nicht-Kana', $out);
+        $this->assertStringContainsString('a.jsonl:5: words fehlt oder ist keine nicht-leere Liste', $out);
+        $this->assertStringContainsString('a.jsonl:6: alt_kind muss romaji, translation oder none sein', $out);
+        $this->assertStringNotContainsString('a.jsonl:7', $out);
+        $this->assertStringNotContainsString('b.jsonl', $out);
         $this->assertSame('annotated', $a->refresh()->status);
         $this->assertSame('annotated', $b->refresh()->status);
         $this->assertSame(2, Annotation::query()->count());

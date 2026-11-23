@@ -85,7 +85,7 @@ class Importer
         }
 
         $key = $data['key'] ?? null;
-        if (! is_string($key) || preg_match('/^(name|song):([0-9a-f]{40})$/', $key, $m) !== 1) {
+        if (! is_string($key) || preg_match('/^(name|song):([0-9a-f]{40})$/D', $key, $m) !== 1) {
             return 'key fehlt oder hat nicht die Form <name|song>:<40 Hex-Zeichen>';
         }
 
@@ -146,13 +146,13 @@ class Importer
         return $value !== '' && mb_strlen($value) <= $max ? $value : null;
     }
 
-    /** Kana without spaces, converted to hiragana, else null. */
+    /** Kana without separators (spaces, ・), converted to hiragana, else null. */
     private function kana(mixed $value): ?string
     {
         if (! is_string($value)) {
             return null;
         }
-        $value = preg_replace('/[\s\x{3000}]+/u', '', $value) ?? '';
+        $value = preg_replace('/[\s\x{3000}\x{30FB}]+/u', '', $value) ?? '';
 
         return Kana::isKanaOnly($value) ? Kana::toHiragana($value) : null;
     }
