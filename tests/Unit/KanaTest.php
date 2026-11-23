@@ -68,6 +68,7 @@ class KanaTest extends TestCase
             ['konya', 'こにゃ'],
             ['kin\'en', 'きんえん'],
             ['kin en', 'きんえん'],
+            ['Shin’ya', 'しんや'],
             ['Hōshō', 'ほうしょう'],
             ['tsūkā', 'つうかあ'],
             ['sha shu sho cha chu cho ja ju jo', 'しゃしゅしょちゃちゅちょじゃじゅじょ'],

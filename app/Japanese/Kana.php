@@ -77,7 +77,7 @@ class Kana
     {
         $s = strtr(mb_strtolower($romaji), self::MACRONS);
         // n' and n before a word boundary are always ん; then drop non-letters.
-        $s = preg_replace("/n'|n(?=[^\\p{L}]|$)/u", 'ん', $s);
+        $s = preg_replace("/n['’]|n(?=[^\\p{L}]|$)/u", 'ん', $s);
         $s = preg_replace('/[^\p{L}]+/u', '', $s);
 
         $chars = mb_str_split($s);
