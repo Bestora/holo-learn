@@ -339,6 +339,36 @@ Server, beim Deploy: Annotationen einlesen → Prüfung → Zerlegung
   Alle werden importiert;
   Zweit- und Gruppenkanäle liefern Songs, Titel und Clips, aber keine
   Namens-Referenz. Inaktive Talente bleiben mit ihrem Archiv dabei.
+## Lernweg (nachträglich vom Auftraggeber, 2026-11-23)
+
+Vorgabe: Der Auftraggeber ist Anfänger. Er will vor allem die **Grundlagen**
+lernen und nur zum Spaß Spezialfälle – „wie Duolingo, nur cooler, mit hololive
+und weniger repetitiv mit denselben Referenzen“.
+
+Umsetzung (Vorschlag des Entwurfs):
+
+- **Grundlagen zuerst.** Reihenfolge neuer Elemente: Hiragana → Katakana → dann
+  Kanji und Vokabeln nach allgemeiner Wichtigkeit (JLPT-Stufe N5 zuerst, dann
+  Schulstufe und Häufigkeit aus KANJIDIC2; bei Vokabeln die als „häufig“
+  markierten Einträge aus JMdict zuerst). Die Häufigkeit bei hololive
+  entscheidet nur noch innerhalb derselben Stufe. Das ersetzt die frühere
+  Regel „innerhalb einer Art nach Häufigkeit in der Referenz-Datenbank“.
+- **Spezial ist Bonus.** Seltene Kanji und Wörter (z. B. 鐘 aus einem Namen)
+  gelten als „Spezial“: gekennzeichnet, höchstens jedes fünfte neue Element,
+  und abschaltbar. Sie halten den Grundlagen-Fortschritt nie auf.
+- **Erst zeigen, dann fragen.** Ein neues Element wird zuerst vorgestellt
+  (Zeichen, Lesung, Romaji, Bedeutung, eine Referenz mit Clip), bevor es
+  abgefragt wird.
+- **Leichter Einstieg je Element.** In den ersten beiden Stufen Auswahl aus
+  vier Antworten, ab Stufe 2 selbst tippen.
+- **Kurze Lektionen.** Eine Lektion hat 10 Karten und mischt Neues mit
+  Wiederholung; danach eine kurze Zusammenfassung. Dazu ein Tageszähler in
+  Folge (Streak) und eine Übersicht des Fortschritts je Art.
+- **Abwechslung.** Jede Karte zeigt eine andere Referenz als beim letzten Mal;
+  innerhalb einer Lektion erscheint keine Referenz zweimal.
+- Radikale kommen erst zusammen mit dem ersten Kanji, das sie enthält, nicht
+  als eigener Block davor.
+
 ## Betrieb (vom Auftraggeber vorgegeben)
 
 - Repo: `https://github.com/Bestora/holo-learn`, Commits als

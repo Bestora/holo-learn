@@ -485,12 +485,40 @@ Items für Kanji/Vokabel/Radikal werden bei Bedarf aus dict_* angelegt.
 Regeln:
 
 ```
+Lernweg (Spec-Abschnitt „Lernweg“, vom Auftraggeber: Grundlagen zuerst,
+Duolingo-artig, Spezial nur als Bonus):
+  Stufe eines Items (items.level, klein = zuerst; items.is_special bool):
+    hiragana 0, katakana 1
+    kanji    10 + (5 − JLPT)  [N5 → 10 … N1 → 14]; ohne JLPT: 20 + Schulstufe;
+             ohne beides: 40 und is_special = true
+    vocab    Stufe des höchsten enthaltenen Kanji; +0 wenn JMdict „häufig“,
+             sonst is_special = true (reine Kana-Wörter gibt es als Item nicht)
+    radical  Stufe des niedrigsten Kanji, das es enthält (kommt mit diesem
+             Kanji, nie davor); ohne Bedeutung: nie anbieten
+  Dafür: dict_kanji um jlpt, grade, frequency erweitern, dict_words um common
+  (bool), dict:import liest sie mit; Item-Erzeugung (Decomposer) setzt level
+  und is_special; ein Befehl items:relevel rechnet bestehende Items neu.
+
 Kartenwahl:  fällige Reviews (due_at ≤ jetzt, ältestes zuerst)
              sonst neues Item, wenn heute < new_items_per_day neu begonnen:
-               Art-Reihenfolge hiragana → katakana → radical → kanji → vocab,
-               innerhalb nach Anzahl verified Referenzen absteigend,
-               nur Items mit ≥ min_references verified Referenzen
+               kleinste level zuerst, innerhalb nach Anzahl verified
+               Referenzen absteigend; nur Items mit ≥ min_references
+               verified Referenzen; Spezial-Items höchstens jedes 5. neue
+               Item und nur, wenn der Nutzer sie nicht abgeschaltet hat
+               (users.specials_enabled, Standard an)
              sonst null („nichts fällig“)
+Vorstellung: Ein Item ohne Review erscheint zuerst als Karte prompt=intro
+             (zeigt Lesung, Romaji, Bedeutung, Referenz mit Clip; keine
+             Wertung); das Bestätigen legt das Review mit Stufe 0 an.
+Antwortart:  Review-Stufe 0–1 → Auswahl aus vier (prompt=choice; drei falsche
+             Antworten von Items derselben Art und ähnlicher level),
+             ab Stufe 2 → tippen (prompt=reading|meaning)
+Lektion:     10 Karten; GET /learn liefert die nächste Karte der laufenden
+             Lektion samt Fortschritt (n von 10); keine Referenz zweimal in
+             einer Lektion; nach der 10. Karte Zusammenfassung (richtig/falsch,
+             neue Items, Streak)
+Streak:      users.streak_days, users.last_lesson_on; eine abgeschlossene
+             Lektion am Folgetag erhöht, eine Lücke setzt auf 1
 Referenz:    zufällig unter den verified Referenzen des Items, nicht
              last_reference_id (außer es gibt nur eine); bevorzugt (Gewicht 3:1)
              Referenzen mit Fundstelle bei Favoriten des Nutzers, ohne Favoriten
@@ -540,6 +568,12 @@ Antwort:     Lesung: Kana::fromRomaji oder direkte Kana, loose-Vergleich mit
 - [ ] **Step 2:** `PagesTest`: `/learn`, `/favorites`, `/privacy` liefern 200 für
   angemeldete Nutzer; `/admin/rejected` 403 ohne `is_admin`; Fußzeilen-Texte
   aus den Global Constraints sind vorhanden.
+- [ ] **Step 2b:** Lernweg-Oberfläche (Spec-Abschnitt „Lernweg“): Startseite mit
+  „Lektion starten“, Streak und Fortschritt je Art (gelernt / verfügbar);
+  Fortschrittsbalken der Lektion (n von 10); Vorstellungs-Karte für neue
+  Elemente; Auswahl-Karte mit vier großen Antwortknöpfen (Tasten 1–4);
+  Zusammenfassung nach der Lektion; Spezial-Elemente mit Kennzeichen „Spezial“;
+  Schalter „Spezial-Elemente“ in den Einstellungen.
 - [ ] **Step 3:** Lernseite umsetzen. Ablauf: Eingabefeld hat Fokus; Enter
   sendet; Romaji wird beim Tippen zu Kana; nach der Antwort erscheint die
   Auflösung (richtig/falsch, erwartete Lesung, Bedeutung, automatische
