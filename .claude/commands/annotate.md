@@ -73,7 +73,7 @@ Du annotierst japanische Texte (hololive-Talentnamen und Songtitel) für eine Le
 Schreibe für jede Zeile, bei der du dir sicher bist, genau eine JSON-Zeile in die Datei <OUT> (JSONL, eine Zeile pro Objekt, kein anderer Text):
 {"key": <unverändert>, "reading": <Lesung des ganzen Textes in Hiragana>, "meaning": <kurze englische Bedeutung, höchstens 80 Zeichen>, "alt_kind": "romaji"|"translation"|"none", "model": "<dein Modellname, z. B. haiku>", "words": [{"surface": …, "reading": …}, …]}
 Regeln:
-- reading und alle Wort-Lesungen NUR in Hiragana (auch für Katakana-Wörter: ミーム → みーむ; ー bleibt ー). Keine Leerzeichen, keine Satzzeichen.
+- reading und alle Wort-Lesungen NUR in Hiragana (auch für Katakana-Wörter: ミーム → みーむ). Das Längenzeichen ー wird unverändert übernommen und nie durch einen Vokal ersetzt oder weggelassen: クレイジー → くれいじー (nicht くれいじい, nicht くれいじ), オリー → おりー. Keine Leerzeichen, keine Satzzeichen.
 - words zerlegt den Text lückenlos von links nach rechts in Wörter. Satzzeichen, Symbole (☆, !, ・, 、) und Leerzeichen gehören zu keinem Wort und werden ausgelassen. Lateinische Wörter und Zahlen im Text sind eigene Wörter mit ihrer japanischen Aussprache in Hiragana als reading (Ahoy → あほい, 3 → さん).
 - Aneinandergehängt müssen die surface-Werte den Text ergeben (ohne die ausgelassenen Zeichen) und die Wort-Lesungen genau reading.
 - Partikel sind eigene Wörter mit ihrer geschriebenen Kana als reading: は → は, へ → へ, を → を (nicht わ/え/お).
@@ -81,6 +81,7 @@ Regeln:
 - Steht ein Verb oder Adjektiv nicht in der Grundform, gib zusätzlich "lemma" (Grundform in normaler Schreibung) und "lemma_reading" (Hiragana) an: 歌った → lemma 歌う, lemma_reading うたう. Bei Grundform und bei Substantiven keine lemma-Felder.
 - Bei kind=name: Familienname und Vorname sind getrennte Wörter (桃鈴 / ねね). Die Lesung richtet sich nach alt, wenn alt der Name in lateinischer Schrift ist; lange Vokale schreibst du aus, auch wenn alt sie weglässt (Kiryu → きりゅう). meaning ist bei Namen der Name in lateinischer Schrift.
 - alt_kind: "romaji", wenn alt die Aussprache des japanischen Textes in lateinischer Schrift wiedergibt; "translation", wenn alt eine Übersetzung oder ein englischer Titel ist; "none", wenn alt null ist oder nichts davon.
+- Zähle bei Wiederholungen die Zeichen nach: モモノネ → もものね (vier Zeichen, vier Kana).
 - Wenn alt eine Umschrift ist, muss deine Lesung dazu passen. Künstlerische Sonderlesungen (宇宙 als そら) nur, wenn alt sie belegt.
 - Bist du bei einer Lesung unsicher, lass die Zeile WEG. Raten ist schlimmer als Auslassen.
 Antworte am Ende nur mit: "<Anzahl geschriebener Zeilen> von <Anzahl gelesener Zeilen>".
