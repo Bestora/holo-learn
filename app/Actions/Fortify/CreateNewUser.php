@@ -4,8 +4,11 @@ namespace App\Actions\Fortify;
 
 use App\Concerns\PasswordValidationRules;
 use App\Concerns\ProfileValidationRules;
+use App\Models\Invitation;
 use App\Models\User;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 use Laravel\Fortify\Contracts\CreatesNewUsers;
 
 class CreateNewUser implements CreatesNewUsers
@@ -13,21 +16,42 @@ class CreateNewUser implements CreatesNewUsers
     use PasswordValidationRules, ProfileValidationRules;
 
     /**
-     * Validate and create a newly registered user.
+     * Validate and create a newly registered user. Registration requires an unused invitation,
+     * which is consumed in the same transaction that creates the user.
      *
      * @param  array<string, string>  $input
      */
     public function create(array $input): User
     {
+        $invalidInvite = 'Diese Einladung ist ungültig oder wurde bereits verwendet.';
+
         Validator::make($input, [
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
+            'invite' => ['required', 'string'],
+        ], [
+            'invite.required' => 'Registrierung ist nur mit Einladung möglich.',
+            'invite.string' => $invalidInvite,
         ])->validate();
 
-        return User::create([
-            'name' => $input['name'],
-            'email' => $input['email'],
-            'password' => $input['password'],
-        ]);
+        return DB::transaction(function () use ($input, $invalidInvite) {
+            $invitation = Invitation::firstWhere('token', $input['invite']);
+
+            // Conditional update so two concurrent registrations cannot both consume the invite.
+            $claimed = $invitation && Invitation::whereKey($invitation->id)
+                ->whereNull('used_at')
+                ->update(['used_at' => now()]);
+
+            if (! $claimed) {
+                throw ValidationException::withMessages(['invite' => $invalidInvite]);
+            }
+
+            return User::forceCreate([
+                'name' => $input['name'],
+                'email' => $input['email'],
+                'password' => $input['password'],
+                'is_admin' => $invitation->is_admin,
+            ]);
+        });
     }
 }

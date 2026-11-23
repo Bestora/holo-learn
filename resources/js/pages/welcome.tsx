@@ -1,4 +1,5 @@
 import { Head, Link, usePage } from '@inertiajs/react';
+import { AppFooter } from '@/components/app-footer';
 import { dashboard, login } from '@/routes';
 import { register } from '@/routes';
 
@@ -383,6 +384,7 @@ export default function Welcome() {
                     </main>
                 </div>
                 <div className="hidden h-14.5 lg:block"></div>
+                <AppFooter />
             </div>
         </>
     );

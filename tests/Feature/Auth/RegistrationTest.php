@@ -2,6 +2,7 @@
 
 namespace Tests\Feature\Auth;
 
+use App\Models\Invitation;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Laravel\Fortify\Features;
 use Tests\TestCase;
@@ -26,11 +27,14 @@ class RegistrationTest extends TestCase
 
     public function test_new_users_can_register()
     {
+        Invitation::create(['token' => 'test-invite']);
+
         $response = $this->post(route('register.store'), [
             'name' => 'Test User',
             'email' => 'test@example.com',
             'password' => 'password',
             'password_confirmation' => 'password',
+            'invite' => 'test-invite',
         ]);
 
         $this->assertAuthenticated();
