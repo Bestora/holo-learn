@@ -34,7 +34,7 @@ class VerifierTest extends TestCase
         $this->assertNull($reference->annotation()->sole()->check_errors);
         $this->assertSame([true, true, true], $this->okFlags($reference));
         $this->assertSame(
-            [['surface' => '花', 'reading' => 'はな', 'ok' => true], ['surface' => 'に', 'reading' => 'に', 'ok' => true], ['surface' => '亡霊', 'reading' => 'ぼうれい', 'ok' => true]],
+            [['surface' => '花', 'reading' => 'はな', 'unit' => null, 'ok' => true], ['surface' => 'に', 'reading' => 'に', 'unit' => null, 'ok' => true], ['surface' => '亡霊', 'reading' => 'ぼうれい', 'unit' => null, 'ok' => true]],
             $reference->annotation()->sole()->words,
         );
     }
@@ -180,6 +180,66 @@ class VerifierTest extends TestCase
             $this->assertSame([], $this->verify($reference), $alt);
             $this->assertSame([true, true], $this->okFlags($reference));
         }
+    }
+
+    public function test_name_with_swapped_readings_is_rejected(): void
+    {
+        $reference = $this->annotated('name', '桃鈴ねね', 'すずももねね', [['桃', 'すず'], ['鈴', 'もも'], ['ねね', 'ねね']], 'Momosuzu Nene');
+
+        $this->assertSame(['romaji_mismatch'], $this->verify($reference));
+    }
+
+    public function test_name_units_group_consecutive_kanji_words(): void
+    {
+        $reference = $this->annotated('name', '小鳥遊キアラ', 'たかなしきあら', [['小', 'たか'], ['鳥遊', 'なし'], ['キアラ', 'きあら']], 'Takanashi Kiara');
+
+        $this->assertSame([], $this->verify($reference));
+        $this->assertSame([0, 0, null], array_column($reference->annotation()->sole()->words, 'unit'));
+        $this->assertSame([true, true, true], $this->okFlags($reference));
+    }
+
+    public function test_song_words_have_no_unit(): void
+    {
+        $reference = $this->annotated('song', '花に亡霊', 'はなにぼうれい', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']]);
+
+        $this->verify($reference);
+
+        $words = $reference->annotation()->sole()->words;
+        $this->assertSame([null, null, null], array_map(fn ($w) => array_key_exists('unit', $w) ? $w['unit'] : 'missing', $words));
+    }
+
+    public function test_name_romaji_completes_final_consonant_and_drops_apostrophe(): void
+    {
+        $reference = $this->annotated('name', '一伊那尓栖', 'にのまえいなにす', [['一', 'にのまえ'], ['伊那尓栖', 'いなにす']], "Ninomae Ina'nis");
+        $this->assertSame([], $this->verify($reference));
+
+        Reference::query()->delete();
+        $oneWord = $this->annotated('name', '一伊那尓栖', 'にのまえいなにす', [['一伊那尓栖', 'にのまえいなにす']], "Ninomae Ina'nis");
+        $this->assertSame([], $this->verify($oneWord));
+    }
+
+    public function test_name_romaji_given_name_first(): void
+    {
+        $reference = $this->annotated('name', '火威青', 'ひおどしあお', [['火威', 'ひおどし'], ['青', 'あお']], 'Ao Hiodoshi');
+
+        $this->assertSame([], $this->verify($reference));
+    }
+
+    public function test_name_units_must_appear_in_order(): void
+    {
+        $reference = $this->annotated('name', '花の亡霊', 'はなのぼうれい', [['花', 'はな'], ['の', 'の'], ['亡霊', 'ぼうれい']], 'Hana Bourei Hana');
+        $this->assertSame([], $this->verify($reference));
+
+        $overlap = $this->annotated('name', '花の花', 'はなのはな', [['花', 'はな'], ['の', 'の'], ['花', 'はな']], 'Hana');
+        $this->assertSame(['romaji_mismatch'], $this->verify($overlap));
+    }
+
+    public function test_historic_kana_in_name(): void
+    {
+        $reference = $this->annotated('name', '沙花叉クロヱ', 'さかまたくろえ', [['沙花叉', 'さかまた'], ['クロヱ', 'くろえ']], 'Sakamata Chloe');
+
+        $this->assertSame([], $this->verify($reference));
+        $this->assertSame([], $this->verify($this->annotated('song', 'ヰゐ', 'いい', [['ヰゐ', 'いい']])));
     }
 
     public function test_name_with_kanji_but_no_romaji_is_rejected(): void

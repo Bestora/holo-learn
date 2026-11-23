@@ -17,8 +17,9 @@ use Illuminate\Support\Facades\DB;
 class Decomposer
 {
     /**
-     * KRADFILE variant forms → the kanji whose meaning they carry. Only pairs that occur in
-     * dict_kanji.radicals and whose parent has meanings (爫→爪, 牜→牛 never occur).
+     * KRADFILE variant forms → the kanji whose meaning they carry; takes precedence over the
+     * variant's own entry. Only pairs that occur in dict_kanji.radicals and whose parent has
+     * meanings (爫→爪, 牜→牛 never occur).
      */
     private const RADICAL_PARENTS = [
         '亻' => '人', '𠆢' => '人', '氵' => '水', '艹' => '艸', '扌' => '手', '忄' => '心', '辶' => '辵',
@@ -70,17 +71,27 @@ class Decomposer
         $dictKanji = $this->dictKanji($kanjiWords, $words);
         $vocab = $ref->kind === 'name' ? collect() : $this->vocab($kanjiWords, $words);
 
+        // names: a kanji carries the reading of its whole unit, so a wrong split inside a
+        // unit (小/たか + 鳥遊/なし) cannot attach a per-word reading
+        $unitReadings = [];
+        foreach ($words as $word) {
+            if (isset($word['unit'])) {
+                $unitReadings[$word['unit']] = ($unitReadings[$word['unit']] ?? '').$word['reading'];
+            }
+        }
+
         foreach ($kanjiWords as $i) {
             $reading = $words[$i]['reading'];
+            $kanjiReading = isset($words[$i]['unit']) ? $unitReadings[$words[$i]['unit']] : $reading;
             foreach ($aligned[$i] as [$char, $position]) {
                 $kanji = $dictKanji[$char] ?? null;
                 if ($kanji === null || Kana::kanjiIn($char) === []) {
                     continue; // unknown kanji, or kana/々 inside the word
                 }
-                $rows[] = ['item_id' => $this->item('kanji', $char, $kanji->readings['plain'], $kanji->meanings)->id, 'position' => $position, 'context_reading' => $reading];
+                $rows[] = ['item_id' => $this->item('kanji', $char, $kanji->readings['plain'], self::meanings($kanji))->id, 'position' => $position, 'context_reading' => $kanjiReading];
                 foreach ($kanji->radicals as $radical) {
-                    $meanings = ($dictKanji[$radical] ?? $dictKanji[self::RADICAL_PARENTS[$radical] ?? ''] ?? null)->meanings ?? [];
-                    $rows[] = ['item_id' => $this->item('radical', $radical, [], $meanings)->id, 'position' => $position, 'context_reading' => null];
+                    $source = $dictKanji[self::RADICAL_PARENTS[$radical] ?? ''] ?? $dictKanji[$radical] ?? null;
+                    $rows[] = ['item_id' => $this->item('radical', $radical, [], $source === null ? [] : self::meanings($source))->id, 'position' => $position, 'context_reading' => null];
                 }
             }
             if (isset($vocab[$i])) {
@@ -139,6 +150,17 @@ class Decomposer
         }
 
         return $items;
+    }
+
+    /**
+     * Meanings without radical-catalogue notes ("grass radical (no. 140)", "radical number 9").
+     *
+     * @return list<string>
+     */
+    private static function meanings(DictKanji $kanji): array
+    {
+        return array_values(array_filter($kanji->meanings, fn (string $m) => preg_match('/radical\b.*\b(no\.?|number)\s*\d+/i', $m) !== 1
+            && preg_match('/^(kangxi )?radical/i', $m) !== 1));
     }
 
     /**

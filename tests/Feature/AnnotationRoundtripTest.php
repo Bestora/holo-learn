@@ -414,7 +414,7 @@ class AnnotationRoundtripTest extends TestCase
             // the dummy reading fails the kana and romaji checks; the kanji title word only loses ok
             $this->assertSame($e['text'] === '花に亡霊' ? 'verified' : 'rejected', $reference->status);
             $this->assertSame("meaning of {$e['text']}", $reference->annotation?->meaning_en);
-            $this->assertSame([['surface' => $e['text'], 'reading' => 'てすと', 'ok' => false]], $reference->annotation->words);
+            $this->assertSame([['surface' => $e['text'], 'reading' => 'てすと', 'unit' => $kind === 'name' ? 0 : null, 'ok' => false]], $reference->annotation->words);
         }
         $this->assertSame([], $this->export());
 

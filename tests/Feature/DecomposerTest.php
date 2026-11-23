@@ -52,8 +52,8 @@ class DecomposerTest extends TestCase
         $this->verify($this->annotated('song', '今日', 'きょう', [['今日', 'きょう']]));
 
         $this->assertSame(['spoon'], $this->item('radical', '匕')->meanings);
-        $this->assertSame(['grass'], $this->item('radical', '艹')->meanings);
-        $this->assertSame(['person'], $this->item('radical', '亻')->meanings);
+        $this->assertSame(['grass'], $this->item('radical', '艹')->meanings); // parent 艸, radical note dropped
+        $this->assertSame(['person'], $this->item('radical', '亻')->meanings); // parent wins over 'radical number 9'
         $this->assertSame(['person'], $this->item('radical', '𠆢')->meanings);
         $this->assertSame([], $this->item('radical', '乙')->meanings);
         $this->assertSame([], $this->item('radical', '乙')->readings);
@@ -91,6 +91,19 @@ class DecomposerTest extends TestCase
         $this->assertSame(['kanji:桃@0=ももすず', 'kanji:鈴@1=ももすず'], $this->links($reference, 'kanji'));
         $this->assertSame(['hiragana:ね@2', 'hiragana:ね@3'], $this->links($reference, 'hiragana'));
         $this->assertSame([], $this->links($reference, 'vocab'));
+    }
+
+    public function test_name_kanji_carry_the_reading_of_their_unit(): void
+    {
+        $split = $this->annotated('name', '桃鈴ねね', 'ももすずねね', [['桃', 'もも'], ['鈴', 'すず'], ['ねね', 'ねね']], 'Momosuzu Nene');
+        $wrong = $this->annotated('name', '小鳥遊キアラ', 'たかなしきあら', [['小', 'たか'], ['鳥遊', 'なし'], ['キアラ', 'きあら']], 'Takanashi Kiara');
+
+        $this->verify($split);
+        $this->verify($wrong);
+
+        $this->assertSame(['kanji:桃@0=ももすず', 'kanji:鈴@1=ももすず'], $this->links($split, 'kanji'));
+        $this->assertSame('verified', $wrong->status);
+        $this->assertSame(['kanji:小@0=たかなし', 'kanji:遊@2=たかなし', 'kanji:鳥@1=たかなし'], $this->links($wrong, 'kanji'));
     }
 
     public function test_name_with_english_style_kana_links_its_kanji(): void
