@@ -6,6 +6,7 @@ use App\Japanese\Kana;
 use App\Models\Annotation;
 use App\Models\Reference;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\File;
 
 /**
  * Reads annotation lines (JSONL, written by AI agents) into the annotations table.
@@ -34,6 +35,23 @@ class Importer
         $result = $this->check($json);
 
         return is_string($result) ? $result : null;
+    }
+
+    /**
+     * Non-blank lines of a JSONL file, keyed by 1-based line number, BOM stripped.
+     *
+     * @return \Generator<int, string>
+     */
+    public static function fileLines(string $file): \Generator
+    {
+        foreach (File::lines($file) as $index => $line) {
+            if ($index === 0) {
+                $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line; // UTF-8 BOM
+            }
+            if (trim($line) !== '') {
+                yield $index + 1 => $line;
+            }
+        }
     }
 
     public function importLine(string $json): bool

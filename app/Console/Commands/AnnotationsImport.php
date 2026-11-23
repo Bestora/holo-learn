@@ -8,7 +8,6 @@ use App\Annotations\Verifier;
 use App\Models\Reference;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\File;
 
 class AnnotationsImport extends Command
 {
@@ -37,17 +36,11 @@ class AnnotationsImport extends Command
         $imported = $skipped = 0;
         $references = [];
         foreach ($files as $file) {
-            foreach (File::lines($file) as $index => $line) {
-                if ($index === 0) {
-                    $line = preg_replace('/^\xEF\xBB\xBF/', '', $line) ?? $line; // UTF-8 BOM
-                }
-                if (trim($line) === '') {
-                    continue;
-                }
+            foreach (Importer::fileLines($file) as $number => $line) {
                 $result = $importer->import($line);
                 if (is_string($result)) {
                     $skipped++;
-                    $this->line(basename($file).':'.($index + 1).': '.$result, verbosity: 'v');
+                    $this->line(basename($file).':'.$number.': '.$result, verbosity: 'v');
 
                     continue;
                 }
