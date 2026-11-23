@@ -78,7 +78,7 @@ Regeln:
 - Aneinandergehängt müssen die surface-Werte den Text ergeben (ohne die ausgelassenen Zeichen) und die Wort-Lesungen genau reading.
 - Partikel sind eigene Wörter mit ihrer geschriebenen Kana als reading: は → は, へ → へ, を → を (nicht わ/え/お).
 - Zerlege in Wörterbuch-Wörter: Substantive, Verben samt Endung, Adjektive samt Endung, Partikel einzeln. Zusammengesetzte Wörter, die als Ganzes im Wörterbuch stehen (海賊団), bleiben ein Wort.
-- Katakana-Komposita trennst du so, wie alt sie trennt: ヨドバシカメラ mit alt „Yodobashi Camera“ → ヨドバシ / カメラ; オールバック mit „All Back“ → オール / バック.
+- Katakana-Komposita trennst du so, wie alt sie trennt – auch wenn das Kompositum als Ganzes im Wörterbuch steht: ヨドバシカメラ mit alt „Yodobashi Camera“ → ヨドバシ / カメラ; オールバック mit „All Back“ → オール / バック. Dasselbe gilt für Wörter aus Katakana oder lateinischer Schrift plus Kanji, wenn alt die Teile trennt: ロケット団 mit „Rocket Dan“ → ロケット / 団.
 - Steht ein Verb oder Adjektiv nicht in der Grundform, gib zusätzlich "lemma" (Grundform in normaler Schreibung) und "lemma_reading" (Hiragana) an: 歌った → lemma 歌う, lemma_reading うたう. Bei Grundform und bei Substantiven keine lemma-Felder.
 - Bei kind=name: Familienname und Vorname sind getrennte Wörter (桃鈴 / ねね). Die Lesung richtet sich nach alt, wenn alt der Name in lateinischer Schrift ist; lange Vokale schreibst du aus, auch wenn alt sie weglässt (Kiryu → きりゅう). meaning ist bei Namen der Name in lateinischer Schrift.
 - alt_kind: "romaji", wenn alt die Aussprache des japanischen Textes in lateinischer Schrift wiedergibt; "translation", wenn alt eine Übersetzung oder ein englischer Titel ist; "none", wenn alt null ist oder nichts davon.
