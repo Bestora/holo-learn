@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Normalizer;
+use RuntimeException;
 
 /**
  * A Japanese text (talent name or song title) that items are learned from.
@@ -14,7 +16,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property int $id
  * @property string $kind name|song
  * @property string $text_ja
- * @property string $text_key sha1 of text_ja
+ * @property string $text_key see keyFor()
  * @property ?string $alt_text
  * @property string $status new|annotated|verified|rejected
  */
@@ -29,7 +31,7 @@ class Reference extends Model
     public static function firstOrCreateFor(string $kind, string $textJa, ?string $alt): self
     {
         $reference = self::query()->firstOrCreate(
-            ['kind' => $kind, 'text_key' => sha1($textJa)],
+            ['kind' => $kind, 'text_key' => self::keyFor($textJa)],
             ['text_ja' => $textJa, 'alt_text' => $alt],
         );
 
@@ -38,6 +40,22 @@ class Reference extends Model
         }
 
         return $reference;
+    }
+
+    /**
+     * sha1 of the normalized text (NFKC, 〜 → ~, whitespace collapsed, Latin lowercased),
+     * so "ＡＢＣ 花" and "abc 花" or "～" and "〜" spellings share one reference.
+     */
+    public static function keyFor(string $textJa): string
+    {
+        if (! class_exists(Normalizer::class)) {
+            throw new RuntimeException('PHP-Erweiterung intl fehlt (Normalizer), nötig für Referenz-Schlüssel');
+        }
+
+        $text = (string) Normalizer::normalize($textJa, Normalizer::FORM_KC);
+        $text = preg_replace('/\s+/u', ' ', str_replace('〜', '~', $text)) ?? $text;
+
+        return sha1(strtolower(mb_trim($text)));
     }
 
     /** @return HasMany<Occurrence, $this> */

@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Holodex\HolodexException;
 use App\Holodex\SongSync;
+use App\Models\Item;
 use App\Models\Occurrence;
 use App\Models\Reference;
 use App\Models\Talent;
@@ -307,7 +308,7 @@ class SongSyncTest extends TestCase
         ]);
     }
 
-    public function test_recleaned_title_moves_occurrence_and_drops_orphaned_new_reference(): void
+    public function test_recleaned_title_moves_occurrence_and_drops_orphaned_reference(): void
     {
         $talent = $this->talent('UCnene');
         $moved = $this->storedSong($talent, 'ファンサ／Fansa', 'song:v1:0');
@@ -323,8 +324,9 @@ class SongSyncTest extends TestCase
         $this->assertSame('ファンサ', $moved->fresh()?->reference?->text_ja);
         $this->assertSame('ジェンガ', $annotated->fresh()?->reference?->text_ja);
         $this->assertNull($dropped->fresh(), 'title without Japanese after re-cleaning loses its occurrence');
-        $this->assertEqualsCanonicalizing(['ファンサ', 'ジェンガ', 'ジェンガ／Jenga'], Reference::query()->pluck('text_ja')->all());
-        $this->assertSame(2, $sync->deletedReferences);
+        // orphans go regardless of status; annotations are re-importable from versioned files
+        $this->assertEqualsCanonicalizing(['ファンサ', 'ジェンガ'], Reference::query()->pluck('text_ja')->all());
+        $this->assertSame(3, $sync->deletedReferences);
     }
 
     public function test_incremental_run_after_aborted_first_run_stops_early_and_full_run_fetches_the_rest(): void
@@ -368,6 +370,113 @@ class SongSyncTest extends TestCase
         $this->artisan('holodex:sync', ['--songs' => true, '--full' => true])->assertSuccessful();
 
         Http::assertSentCount(3 + 1 + 3);
+    }
+
+    public function test_artist_only_title_is_skipped_and_counted(): void
+    {
+        $talent = $this->talent('UCnene');
+        $overdose = $this->song('Overdose / なとり', 'v1');
+        $overdose['original_artist'] = 'なとり';
+        $yoasobi = $this->song('夜に駆ける / Yoru ni Kakeru - YOASOBI', 'v2');
+        $yoasobi['original_artist'] = 'YOASOBI';
+        $this->fakeSongs(['UCnene' => [[$overdose, $yoasobi]]]);
+
+        $sync = app(SongSync::class);
+        $this->assertSame(1, $sync->run($talent));
+
+        $this->assertSame(['夜に駆ける' => 'Yoru ni Kakeru'], Reference::query()->pluck('alt_text', 'text_ja')->all());
+        $this->assertSame(1, $sync->skippedArtistOnly);
+        $this->assertSame(0, $sync->skippedNoJapanese);
+    }
+
+    public function test_same_source_id_twice_in_one_run_first_wins(): void
+    {
+        $talent = $this->talent('UCnene');
+        $this->fakeSongs(['UCnene' => [[$this->song('フレンズ', 'v1', 5), $this->song('別の歌', 'v1', 5)]]]);
+
+        $sync = app(SongSync::class);
+        $sync->run($talent);
+        $sync->run($talent, full: true);
+
+        $this->assertSame('フレンズ', Occurrence::sole()->reference?->text_ja);
+        $this->assertSame(['フレンズ'], Reference::query()->pluck('text_ja')->all());
+        $this->assertSame(1, $sync->skippedDuplicate);
+        $this->assertSame(0, $sync->deletedReferences);
+    }
+
+    public function test_no_progress_file_without_total(): void
+    {
+        $file = sys_get_temp_dir().'/holo-progress-'.uniqid();
+        config(['hololearn.progress_file' => $file]);
+        $talent = $this->talent('UCnene');
+        $seen = [];
+        Http::fake(function ($request) use ($file, &$seen) {
+            $seen[] = is_file($file);
+            $offset = (int) $request->data()['offset'];
+
+            return Http::response(['items' => $this->songs($offset === 0 ? 50 : 10, $offset)]);
+        });
+
+        $this->assertSame(60, $this->sync($talent));
+
+        $this->assertSame([false, false], $seen);
+        $this->assertFileDoesNotExist($file);
+    }
+
+    public function test_command_logs_response_without_items_and_continues(): void
+    {
+        Log::spy();
+        $this->talent('UCbroken', 1);
+        $this->talent('UCok', 2);
+        Http::fake(fn ($request) => $request->data()['channel_id'] === 'UCbroken'
+            ? Http::response(['total' => 3])
+            : Http::response(['total' => 1, 'items' => [$this->song('フレンズ', 'v1')]]));
+
+        $this->artisan('holodex:sync', ['--songs' => true])->assertFailed();
+
+        $this->assertSame(1, Occurrence::count());
+        Log::shouldHaveReceived('error')->once()->withArgs(fn (string $message, array $context) => $context['status'] === 200
+            && $context['path'] === '/songs/latest'
+            && $context['channel_id'] === 'UCbroken');
+    }
+
+    public function test_reference_key_is_normalized(): void
+    {
+        $tilde = Reference::firstOrCreateFor('song', 'secret base ～君がくれたもの～', null);
+        $wave = Reference::firstOrCreateFor('song', 'secret base 〜君がくれたもの〜', null);
+        $wide = Reference::firstOrCreateFor('song', 'ＡＢＣ 花', null);
+        $narrow = Reference::firstOrCreateFor('song', ' abc   花', null);
+
+        $this->assertSame($tilde->id, $wave->id);
+        $this->assertSame($wide->id, $narrow->id);
+        $this->assertSame(['secret base ～君がくれたもの～', 'ＡＢＣ 花'], Reference::query()->orderBy('id')->pluck('text_ja')->all());
+        $this->assertSame(sha1('abc 花'), $wide->text_key);
+    }
+
+    public function test_key_migration_merges_duplicates_into_lowest_id(): void
+    {
+        $talent = $this->talent('UCnene');
+        $old = fn (string $text, string $status = 'new') => Reference::query()->create(['kind' => 'song', 'text_ja' => $text, 'text_key' => sha1($text), 'status' => $status]);
+        $keep = $old('secret base ～君がくれたもの～');
+        $dup = $old('secret base 〜君がくれたもの〜', 'annotated');
+        $other = $old('ＡＢＣ 花');
+        $name = Reference::query()->create(['kind' => 'name', 'text_ja' => 'ＡＢＣ 花', 'text_key' => sha1('ＡＢＣ 花')]);
+        foreach ([[$keep, 's1'], [$dup, 's2'], [$name, 's3']] as [$reference, $sourceId]) {
+            Occurrence::query()->create(['reference_id' => $reference->id, 'talent_id' => $talent->id, 'source_id' => $sourceId]);
+        }
+        $item = Item::query()->create(['kind' => 'kanji', 'characters' => '君', 'readings' => ['きみ'], 'meanings' => ['you']]);
+        $item->references()->attach($dup->id, ['position' => 3]);
+        $item->references()->attach($keep->id, ['position' => 1]);
+        $item->references()->attach($dup->id, ['position' => 1]);
+
+        (require database_path('migrations/2026_11_23_200005_normalize_reference_keys.php'))->up();
+
+        $this->assertSame([$keep->id, $other->id, $name->id], Reference::query()->orderBy('id')->pluck('id')->all());
+        $this->assertSame([$keep->id, $keep->id, $name->id], Occurrence::query()->orderBy('source_id')->pluck('reference_id')->all());
+        $this->assertSame(Reference::keyFor('secret base 〜君がくれたもの〜'), $keep->fresh()?->text_key);
+        $this->assertSame(sha1('abc 花'), $other->fresh()?->text_key);
+        $this->assertSame(sha1('abc 花'), $name->fresh()?->text_key);
+        $this->assertSame([1, 3], $item->references()->orderByPivot('position')->get()->map(fn (Reference $r) => [$r->id, $r->pivot->position])->filter(fn ($p) => $p[0] === $keep->id)->pluck(1)->all());
     }
 
     public function test_reference_texts_are_text_columns(): void

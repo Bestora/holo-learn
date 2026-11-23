@@ -21,10 +21,19 @@ class SongSync
 
     public int $skippedMalformed = 0;
 
+    /** Titles whose only Japanese segment is the original artist ("Overdose / なとり"). */
+    public int $skippedArtistOnly = 0;
+
+    /** Later items of a source_id already seen in this run (first wins, so nothing flips between runs). */
+    public int $skippedDuplicate = 0;
+
     public int $requests = 0;
 
-    /** Song references deleted because re-cleaning left them unannotated and unused. */
+    /** Song references deleted because re-cleaning left them without occurrences. */
     public int $deletedReferences = 0;
+
+    /** @var array<string, true> source_ids handled in this run */
+    private array $seen = [];
 
     public function __construct(private Client $client) {}
 
@@ -35,7 +44,9 @@ class SongSync
      */
     public function run(Talent $talent, bool $full = false): int
     {
-        $this->skippedNoJapanese = $this->skippedMalformed = $this->requests = $this->deletedReferences = 0;
+        $this->skippedNoJapanese = $this->skippedMalformed = $this->skippedArtistOnly = $this->skippedDuplicate = 0;
+        $this->requests = $this->deletedReferences = 0;
+        $this->seen = [];
         $created = 0;
         $offset = 0;
         $progressFile = config('hololearn.progress_file');
@@ -50,7 +61,7 @@ class SongSync
                     throw new HolodexException(200, self::PATH, 'Antwort ohne items');
                 }
                 $items = $data['items'];
-                $total = is_numeric($data['total'] ?? null) ? (int) $data['total'] : PHP_INT_MAX;
+                $total = is_numeric($data['total'] ?? null) ? (int) $data['total'] : null;
 
                 $known = $new = 0;
                 foreach ($items as $item) {
@@ -63,14 +74,14 @@ class SongSync
                 $created += $new;
                 $offset += self::PAGE_SIZE;
 
-                if (is_string($progressFile)) {
+                if (is_string($progressFile) && $total !== null) {
                     file_put_contents($progressFile, min($offset, $total).' '.$total." Songs\n");
                 }
 
                 // Incremental run: a page that adds nothing but holds already stored songs means the rest is known too.
                 // A page of only non-Japanese titles has no stored songs, so it does not stop a first run.
                 $pageKnown = ! $full && $new === 0 && $known > 0;
-            } while (count($items) >= self::PAGE_SIZE && $offset < $total && ! $pageKnown && $this->requests < self::MAX_PAGES);
+            } while (count($items) >= self::PAGE_SIZE && $offset < ($total ?? PHP_INT_MAX) && ! $pageKnown && $this->requests < self::MAX_PAGES);
         } finally {
             if (is_string($progressFile)) {
                 @unlink($progressFile);
@@ -95,16 +106,27 @@ class SongSync
         $start = is_numeric($item['start'] ?? null) ? (int) $item['start'] : null;
         $end = is_numeric($item['end'] ?? null) ? (int) $item['end'] : null;
         $sourceId = "song:{$videoId}:".($start ?? 0);
+        if (isset($this->seen[$sourceId])) {
+            $this->skippedDuplicate++;
+
+            return 'skipped';
+        }
+        $this->seen[$sourceId] = true;
 
         $occurrence = Occurrence::query()->with('reference')->firstWhere('source_id', $sourceId);
         $previous = $occurrence?->reference;
 
-        ['text_ja' => $textJa, 'alt' => $alt] = TextCleaner::songName((string) $name);
+        $artist = is_string($item['original_artist'] ?? null) && mb_trim($item['original_artist']) !== '' ? $item['original_artist'] : null;
+        ['text_ja' => $textJa, 'alt' => $alt] = TextCleaner::songName((string) $name, $artist);
         if ($textJa === null) {
             // A stored title may lose its Japanese under newer cleaning rules.
             $occurrence?->delete();
             $this->dropIfOrphaned($previous);
-            $this->skippedNoJapanese++;
+            if ($artist !== null && TextCleaner::songName((string) $name)['text_ja'] !== null) {
+                $this->skippedArtistOnly++;
+            } else {
+                $this->skippedNoJapanese++;
+            }
 
             return 'skipped';
         }
@@ -135,7 +157,8 @@ class SongSync
 
     private function dropIfOrphaned(?Reference $reference): void
     {
-        if ($reference !== null && $reference->status === 'new' && ! $reference->occurrences()->exists()) {
+        // whatever its status: annotations are re-importable from versioned files
+        if ($reference !== null && ! $reference->occurrences()->exists()) {
             $reference->delete();
             $this->deletedReferences++;
         }

@@ -53,7 +53,8 @@ class TextCleanerTest extends TestCase
     {
         $this->assertSame(['text_ja' => '夜もすがら君想ふ', 'alt' => 'Yomosugara Kimi Omou'], TextCleaner::songName('Cover / 夜もすがら君想ふ / Yomosugara Kimi Omou (Short ver.)'));
         $this->assertSame(['text_ja' => 'きゅうくらりん', 'alt' => null], TextCleaner::songName('きゅうくらりん（歌ってみた）'));
-        $this->assertSame(['text_ja' => '星街すいせい', 'alt' => null], TextCleaner::songName('Stellar / 星街すいせい'));
+        // the Japanese segment is the artist, not the title
+        $this->assertSame(['text_ja' => null, 'alt' => null], TextCleaner::songName('Stellar / 星街すいせい', '星街すいせい'));
         $this->assertSame(['text_ja' => 'おねがい、ダーリン', 'alt' => null], TextCleaner::songName('おねがい、ダーリン / おねがいダーリン'));
         $this->assertSame(['text_ja' => null, 'alt' => null], TextCleaner::songName('Song (カバー)'));
         $this->assertSame(['text_ja' => null, 'alt' => null], TextCleaner::songName('A/B'));
@@ -91,6 +92,38 @@ class TextCleanerTest extends TestCase
             'dash suffix with Japanese stays' => ['恋 - 愛の歌', '恋 - 愛の歌', null],
             'slash alt wins over dash' => ['恋 - Koi / Love', '恋', 'Love'],
         ];
+    }
+
+    /** @return array<string, array{string, ?string, ?string, ?string}> */
+    public static function reviewSongTitles(): array
+    {
+        // name, original_artist, text_ja, alt
+        return [
+            'artist only' => ['Overdose / なとり', 'なとり', null, null],
+            'artist after dash in alt' => ['夜に駆ける / Yoru ni Kakeru - YOASOBI', 'YOASOBI', '夜に駆ける', 'Yoru ni Kakeru'],
+            'artist after dash, feat' => ['恋愛裁判 - 40mP feat. 初音ミク', '40mP', '恋愛裁判', null],
+            'artist compare ignores inner spaces' => ['Overdose / な と り ', ' なとり', null, null],
+            'artist compare is not kana-insensitive' => ['Overdose / なとり', 'ナトリ', 'なとり', null],
+            'artist compare ignores case and spaces 2' => ['Bling-Bang-Bang-Born / creepy  nuts', 'Creepy Nuts', null, null],
+            'unspaced slash split' => ['アイドル/Idol', null, 'アイドル', 'Idol'],
+            'unspaced slash, Japanese right' => ['ハロ/ハワユ', null, 'ハロ/ハワユ', null],
+            'unspaced slash, Latin left' => ['Fate/Zero 主題歌', null, 'Fate/Zero 主題歌', null],
+            'unspaced slash, digit left' => ['1/3の純情な感情', null, '1/3の純情な感情', null],
+            'feat glued' => ['サリシノハラfeat.初音ミク', null, 'サリシノハラ', null],
+            'feat without dot' => ['フレンズ feat Mio', null, 'フレンズ', null],
+            'feat inside a word' => ['Defeat the 敵', null, 'Defeat the 敵', null],
+            'ft inside a word' => ['soft 雨', null, 'soft 雨', null],
+            'en dash' => ['メルト – Melt', null, 'メルト', 'Melt'],
+            'em dash' => ['メルト — Melt', null, 'メルト', 'Melt'],
+            // known miss, not special-cased: the emoticon's ／ splits the title
+            'emoticon known miss' => ['トルコ行進曲 - オワタ＼(^o^)／', null, 'トルコ行進曲 - オワタ＼', null],
+        ];
+    }
+
+    #[DataProvider('reviewSongTitles')]
+    public function test_song_name_with_artist_and_edge_cases(string $name, ?string $artist, ?string $textJa, ?string $alt): void
+    {
+        $this->assertSame(['text_ja' => $textJa, 'alt' => $alt], TextCleaner::songName($name, $artist));
     }
 
     #[DataProvider('realSongTitles')]

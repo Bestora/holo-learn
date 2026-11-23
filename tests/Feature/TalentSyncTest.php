@@ -101,7 +101,7 @@ class TalentSyncTest extends TestCase
         $this->assertSame('https://img/new', $talent->photo_url);
     }
 
-    public function test_changed_name_moves_occurrence_and_drops_orphaned_new_reference(): void
+    public function test_changed_name_moves_occurrence_and_drops_orphaned_reference(): void
     {
         Http::fake(['*' => Http::sequence()
             ->push([$this->channel(self::NENE, 'Nene Ch.ねねちゃんねる', 'Momosuzu Nene'), $this->channel('UCother', 'Other Ch. 他人', 'Other')])
@@ -117,8 +117,8 @@ class TalentSyncTest extends TestCase
 
         $this->assertSame($occurrence->id, Occurrence::query()->where('source_id', 'name:'.self::NENE)->sole()->id);
         $this->assertSame('桃鈴ねね', $occurrence->fresh()?->reference?->text_ja);
-        // orphaned "new" references are gone, annotated work is kept
-        $this->assertEqualsCanonicalizing(['桃鈴ねね', '他人', '他人さん'], Reference::query()->pluck('text_ja')->all());
+        // orphaned references are gone regardless of status (annotations are re-importable from versioned files)
+        $this->assertEqualsCanonicalizing(['桃鈴ねね', '他人さん'], Reference::query()->pluck('text_ja')->all());
         $this->assertSame(2, Occurrence::count());
     }
 

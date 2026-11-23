@@ -65,7 +65,8 @@ class HolodexSync extends Command
             try {
                 $created = $songs->run($talent, (bool) $this->option('full'));
                 $this->info("Songs {$talent->name_en}: {$created} neue Fundstellen, "
-                    ."{$songs->skippedNoJapanese} ohne Japanisch, {$songs->skippedMalformed} fehlerhaft, "
+                    ."{$songs->skippedNoJapanese} ohne Japanisch, {$songs->skippedArtistOnly} nur Interpret, "
+                    ."{$songs->skippedDuplicate} doppelt, {$songs->skippedMalformed} fehlerhaft, "
                     ."{$songs->deletedReferences} verwaiste Referenzen gelöscht, {$songs->requests} Abrufe");
             } catch (HolodexException $e) {
                 $this->logFailure($e, "Songs {$talent->name_en} ({$talent->holodex_channel_id}) fehlgeschlagen", $talent->holodex_channel_id);

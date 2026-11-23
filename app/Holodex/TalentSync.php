@@ -82,10 +82,11 @@ class TalentSync
             }
             $previous->whereNotIn('source_id', $current)->each->delete();
 
-            // Renamed or dropped names: delete old references that are unannotated and no longer used.
+            // Renamed or dropped names: delete old references nothing uses any more, whatever their status
+            // (annotations are re-importable from versioned files).
             foreach ($previous->pluck('reference')->filter()->unique('id') as $reference) {
                 /** @var Reference $reference */
-                if ($reference->status === 'new' && ! $reference->occurrences()->exists()) {
+                if (! $reference->occurrences()->exists()) {
                     $reference->delete();
                 }
             }
