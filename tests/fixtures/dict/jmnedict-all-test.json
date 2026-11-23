@@ -1,0 +1,11 @@
+{
+"version": "3.6.2",
+"languages": ["all"],
+"commonOnly": false,
+"dictDate": "2026-11-16",
+"dictRevisions": ["1.08"],
+"tags": {"fem":"female given name or forename"},
+"words": [
+{"id":"9999999","kanji":[{"text":"桃鈴","tags":[]}],"kana":[{"text":"ももすず","tags":[],"appliesToKanji":["*"]}],"translation":[{"type":["surname"],"related":[],"translation":[{"lang":"eng","text":"Momosuzu"},{"lang":"ger","text":"Momosuzu (de)"}]}]},
+{"id":"5545368","kanji":[{"text":"兎田","tags":[]}],"kana":[{"text":"うさいだ","tags":[],"appliesToKanji":["*"]}],"translation":[{"type":["place"],"related":[],"translation":[{"lang":"eng","text":"Usaida"}]}]}]
+}

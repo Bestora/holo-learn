@@ -1,0 +1,13 @@
+{
+"version": "3.6.2",
+"languages": ["eng"],
+"commonOnly": false,
+"dictDate": "2026-11-16",
+"dictRevisions": ["1.09"],
+"tags": {"n":"noun (common) (futsuumeishi)"},
+"words": [
+{"id":"1579110","kanji":[{"common":true,"text":"今日","tags":[]}],"kana":[{"common":true,"text":"きょう","tags":["gikun"],"appliesToKanji":["*"]},{"common":true,"text":"こんにち","tags":[],"appliesToKanji":["*"]},{"common":false,"text":"こんち","tags":[],"appliesToKanji":["*"]},{"common":false,"text":"こんじつ","tags":[],"appliesToKanji":["*"]}],"sense":[{"partOfSpeech":["n","adv"],"appliesToKanji":["*"],"appliesToKana":["*"],"related":[],"antonym":[],"field":[],"dialect":[],"misc":[],"info":[],"languageSource":[],"gloss":[{"lang":"eng","gender":null,"type":null,"text":"today"},{"lang":"eng","gender":null,"type":null,"text":"this day"}]},{"partOfSpeech":["n","adv"],"appliesToKanji":["*"],"appliesToKana":["こんにち"],"related":[],"antonym":[],"field":[],"dialect":[],"misc":[],"info":[],"languageSource":[],"gloss":[{"lang":"eng","gender":null,"type":null,"text":"these days"},{"lang":"eng","gender":null,"type":null,"text":"recently"},{"lang":"eng","gender":null,"type":null,"text":"nowadays"}]}]},
+{"id":"1220210","kanji":[{"common":true,"text":"机","tags":[]},{"common":false,"text":"案","tags":["oK"]}],"kana":[{"common":true,"text":"つくえ","tags":[],"appliesToKanji":["*"]},{"common":false,"text":"つき","tags":["ok"],"appliesToKanji":["机"]}],"sense":[{"partOfSpeech":["n"],"appliesToKanji":["*"],"appliesToKana":["*"],"related":[],"antonym":[],"field":[],"dialect":[],"misc":[],"info":[],"languageSource":[],"gloss":[{"lang":"eng","gender":null,"type":null,"text":"desk"}]}]},
+{"id":"2857380","kanji":[{"common":false,"text":"否","tags":[]}],"kana":[{"common":true,"text":"いや","tags":[],"appliesToKanji":["*"]}],"sense":[{"partOfSpeech":["int"],"appliesToKanji":["*"],"appliesToKana":["*"],"related":[],"antonym":[],"field":[],"dialect":[],"misc":["uk"],"info":[],"languageSource":[],"gloss":[{"lang":"eng","gender":null,"type":null,"text":"no"}]}]},
+{"id":"1632330","kanji":[],"kana":[{"common":true,"text":"にゃー","tags":[],"appliesToKanji":["*"]},{"common":false,"text":"にゃあ","tags":[],"appliesToKanji":["*"]},{"common":false,"text":"にゃお","tags":[],"appliesToKanji":["*"]},{"common":false,"text":"にゃあご","tags":[],"appliesToKanji":["*"]}],"sense":[{"partOfSpeech":["adv","adv-to"],"appliesToKanji":["*"],"appliesToKana":["*"],"related":[],"antonym":[],"field":[],"dialect":[],"misc":["on-mim"],"info":[],"languageSource":[],"gloss":[{"lang":"eng","gender":null,"type":null,"text":"meow"},{"lang":"eng","gender":null,"type":null,"text":"miaow"}]}]}]
+}
