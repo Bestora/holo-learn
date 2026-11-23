@@ -11,8 +11,10 @@ use Normalizer;
  * - a Latin word consumes the next token if it equals its surface, else none (never compared);
  * - a katakana word may consume one token unchecked (the English spelling of a loanword;
  *   its reading is already tied to its surface by kana_mismatch);
- * - every other word must lie in a run of non-Latin words whose joined reading matches
- *   1–6 joined tokens as romaji. Pure, no database.
+ * - every other word must lie in a romaji run (one word : 1–6 tokens, or several words : one
+ *   token) whose joined reading matches the joined tokens.
+ * Kanji-free titles are not checked. If no real alignment exists but the alt has the shape of one
+ * (runs over tokens that convert to kana), it is a mismatch whatever alt_kind says. Pure, no database.
  */
 class SongRomaji
 {
@@ -31,13 +33,20 @@ class SongRomaji
 
         $alt = (string) Normalizer::normalize($alt, Normalizer::FORM_KC);
         $classified = self::classify($words);
+        $tokens = self::tokens($alt, $classified);
         $memo = [];
-        if (self::aligns($classified, self::tokens($alt, $classified), 0, 0, $memo)) {
+        if (self::aligns($classified, $tokens, 0, 0, false, $memo)) {
             return true;
         }
+        // The alt has the shape of a romanization of this title (romaji where the words need it)
+        // but the readings do not match it: a mismatch, whatever alt_kind claims.
+        $memo = [];
+        if (self::aligns($classified, $tokens, 0, 0, true, $memo)) {
+            return false;
+        }
 
-        // Not aligned: still romaji (and so a mismatch) when the alt converts completely to kana
-        // once Latin words of the title are taken out. The alt_kind claim is not trusted.
+        // Still romaji (and so a mismatch) when the alt converts completely to kana once Latin
+        // words of the title are taken out. The alt_kind claim is not trusted.
         $removed = false;
         foreach ($words as $word) {
             $surface = trim((string) Normalizer::normalize($word['surface'], Normalizer::FORM_KC));
@@ -117,13 +126,14 @@ class SongRomaji
 
     /**
      * Whether words from $i and tokens from $t can be partitioned into Latin steps, katakana
-     * wildcards and romaji runs. Memoised over ($i, $t): at most words² × tokens × 6 run checks.
+     * wildcards and romaji runs. With $shape a run only needs tokens that convert completely to
+     * kana, not the readings. Memoised over ($i, $t): at most words × (words + 6) run checks.
      *
      * @param  list<array{class: 'L'|'K'|'J', key: string, reading: string, spoken: string}>  $words
      * @param  list<array{0: string, 1: bool}>  $tokens
      * @param  array<string, bool>  $memo
      */
-    private static function aligns(array $words, array $tokens, int $i, int $t, array &$memo): bool
+    private static function aligns(array $words, array $tokens, int $i, int $t, bool $shape, array &$memo): bool
     {
         $n = count($words);
         $m = count($tokens);
@@ -139,34 +149,48 @@ class SongRomaji
         if ($word['class'] === 'L') {
             $equal = $word['key'] !== '' && $t < $m && Verifier::normalize($tokens[$t][0]) === $word['key'];
 
-            return $memo[$key] = self::aligns($words, $tokens, $i + 1, $t + ($equal ? 1 : 0), $memo);
+            return $memo[$key] = self::aligns($words, $tokens, $i + 1, $t + ($equal ? 1 : 0), $shape, $memo);
         }
 
         // exactly one token: more would let it eat the first token of a split kanji word
-        if ($word['class'] === 'K' && $t < $m && self::aligns($words, $tokens, $i + 1, $t + 1, $memo)) {
+        if ($word['class'] === 'K' && $t < $m && self::aligns($words, $tokens, $i + 1, $t + 1, $shape, $memo)) {
             return $memo[$key] = true;
         }
 
-        $reading = $spoken = '';
+        // A run is one word against 1–6 tokens or several words against one token; never many
+        // to many, which would let a reading shift between words (ほうしょうかい + ぞくだん).
         // ponytail: no word cap (ねねねねねねねね is eight words in one token); bounded by the title
-        for ($a = 0; $i + $a < $n && $words[$i + $a]['class'] !== 'L'; $a++) {
-            $reading .= $words[$i + $a]['reading'];
-            $spoken .= $words[$i + $a]['spoken'];
+        $reading = $spoken = '';
+        for ($a = 1; $i + $a <= $n && $words[$i + $a - 1]['class'] !== 'L'; $a++) {
+            $reading .= $words[$i + $a - 1]['reading'];
+            $spoken .= $words[$i + $a - 1]['spoken'];
             $joined = '';
-            for ($b = 1; $b <= self::MAX_RUN_TOKENS && $t + $b <= $m; $b++) {
+            for ($b = 1; $b <= ($a === 1 ? self::MAX_RUN_TOKENS : 1) && $t + $b <= $m; $b++) {
                 // separate tokens joined with a space so a token-final n stays ん, as in the whole alt
                 [$text, $glued] = $tokens[$t + $b - 1];
                 $joined .= ($b === 1 || $glued ? '' : ' ').$text;
-                $romaji = Kana::fromRomaji($joined);
-                foreach (array_unique([$reading, $spoken, self::mergeN($reading), self::mergeN($spoken)]) as $variant) {
-                    if (Kana::matchesRomaji($variant, $romaji) && self::aligns($words, $tokens, $i + $a + 1, $t + $b, $memo)) {
-                        return $memo[$key] = true;
-                    }
+                if (self::runMatches(Kana::fromRomaji($joined), $reading, $spoken, $shape)
+                    && self::aligns($words, $tokens, $i + $a, $t + $b, $shape, $memo)) {
+                    return $memo[$key] = true;
                 }
             }
         }
 
         return $memo[$key] = false;
+    }
+
+    private static function runMatches(string $romaji, string $reading, string $spoken, bool $shape): bool
+    {
+        if ($shape) {
+            return Kana::isKanaOnly($romaji);
+        }
+        foreach (array_unique([$reading, $spoken, self::mergeN($reading), self::mergeN($spoken)]) as $variant) {
+            if (Kana::matchesRomaji($variant, $romaji)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

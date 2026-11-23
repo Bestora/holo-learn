@@ -470,6 +470,21 @@ class VerifierTest extends TestCase
             'kana-only title over three tokens' => ['ウォーアイニー', 'Woh I Nee', [['ウォーアイニー', 'うぉーあいにー']], []],
             'kana-only title, converting translation' => ['ロッタラ ロッタラ', 'Lotta Love, Lotta Love', [['ロッタラ', 'ろったら'], ['ロッタラ', 'ろったら']], [], 'translation'],
             'translation is no romaji' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], [], 'translation'],
+            'english words that do not convert' => ['#あくあ色ぱれっと', 'Aqua Iro Palette', [['あくあ', 'あくあ'], ['色', 'いろ'], ['ぱれっと', 'ぱれっと']], [], 'translation'],
+            'english word between romaji' => ['腐れ外道とチョコレゐト', 'Kusare-Gedou and Chocolate', [['腐れ外道', 'くされげどう'], ['と', 'と'], ['チョコレゐト', 'ちょこれゐと']], [], 'translation'],
+            // accepted loss: How takes the wildcard, so "to Sekai Seifuku" has the shape of romaji for 世界征服
+            'english prefix of romaji' => ['ハウトゥー世界征服', 'How to Sekai Seifuku', [['ハウトゥー', 'はうとぅー'], ['世界征服', 'せかいせいふく']], $rejected, 'translation'],
+            // a run is one word against 1–6 tokens or several words against one token
+            'reading shifted across words and tokens' => ['宝鐘海賊団', 'Houshou Kaizokudan', [['宝鐘', 'ほうしょうかい'], ['海賊団', 'ぞくだん']], $rejected],
+            'reading not shifted' => ['宝鐘海賊団', 'Houshou Kaizokudan', [['宝鐘', 'ほうしょう'], ['海賊団', 'かいぞくだん']], []],
+            'particle shifted across words and tokens' => ['明日晴れ', 'Ashita Hare', [['明日', 'あしたは'], ['晴れ', 'れ']], $rejected],
+            'particle not shifted' => ['明日晴れ', 'Ashita Hare', [['明日', 'あした'], ['晴れ', 'はれ']], []],
+            'several words in one token' => ['世界は恋に落ちている', 'Sekai wa Koi ni Ochiteiru', [['世界', 'せかい'], ['は', 'は'], ['恋', 'こい'], ['に', 'に'], ['落ち', 'おち'], ['て', 'て'], ['いる', 'いる']], []],
+            'two words in one token' => ['花咲く', 'Hanasaku', [['花', 'はな'], ['咲く', 'さく']], []],
+            // ponytail: remaining ceiling: a reading shifted between words inside one token is undetectable
+            'reading shifted inside one token' => ['花咲く', 'Hanasaku', [['花', 'はなさ'], ['咲く', 'く']], []],
+            // a middle dot does not stop a katakana word from being a one-token wildcard
+            'katakana word with middle dot' => ['ハコス・ベールズの歌', 'Baelz no Uta', [['ハコス・ベールズ', 'はこすべーるず'], ['の', 'の'], ['歌', 'うた']], []],
             // a kanji word must always be matched by romaji tokens
             'kakumei wrong' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくべい']], $rejected],
             'hatsukoi wrong' => ['初恋サイダー', 'Hatsukoi Cider', [['初恋', 'しょれん'], ['サイダー', 'さいだー']], $rejected],
@@ -488,6 +503,45 @@ class VerifierTest extends TestCase
      */
     #[DataProvider('alignmentProbes')]
     public function test_song_romaji_alignment(string $text, string $alt, array $words, array $errors, string $altKind = 'romaji'): void
+    {
+        $reference = $this->annotated('song', $text, implode('', array_column($words, 1)), $words, $alt, $altKind);
+
+        $this->assertSame($errors, $this->verify($reference));
+    }
+
+    /** @return array<string, array{string, string, list<array{0: string, 1: string}>, list<string>, string}> */
+    public static function mixedAltProbes(): array
+    {
+        $titles = [
+            'genjyou' => ['現状ディストラクション', 'Genjyou Destruction', [['現状', 'げんじょう', 'げんしょう'], ['ディストラクション', 'でぃすとらくしょん']]],
+            'hatsukoi' => ['初恋サイダー', 'Hatsukoi Cider', [['初恋', 'はつこい', 'しょれん'], ['サイダー', 'さいだー']]],
+            'kakumei' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくめい', 'かくべい']]],
+            'uta' => ['ヨドバシカメラの歌', 'Yodobashi Camera no Uta', [['ヨドバシ', 'よどばし'], ['カメラ', 'かめら'], ['の', 'の'], ['歌', 'うた', 'か']]],
+            'hanasaku' => ['花咲く☆最強レジェンドDays', 'Hanasaku Saikyou Legend DAYS', [['花咲く', 'はなさく', 'はなざく'], ['最強', 'さいきょう'], ['レジェンド', 'れじぇんど'], ['Days', 'でいず']]],
+            'tokyo' => ['東京サマーセッション', 'Tokyo Summer Session', [['東京', 'とうきょう', 'ひがしきょう'], ['サマー', 'さまー'], ['セッション', 'せっしょん']]],
+            'yamato' => ['大和撫子エデュケイション', 'Yamato Nadeshiko Education', [['大和撫子', 'やまとなでしこ', 'だいわなでしこ'], ['エデュケイション', 'えでゅけいしょん']]],
+        ];
+        $probes = [];
+        foreach ($titles as $name => [$text, $alt, $words]) {
+            $right = array_map(fn (array $w) => [$w[0], $w[1]], $words);
+            $wrong = array_map(fn (array $w) => [$w[0], $w[2] ?? $w[1]], $words);
+            foreach (['translation', 'none', 'romaji'] as $kind) {
+                $probes["$name, $kind"] = [$text, $alt, $right, [], $kind];
+                $probes["$name wrong, $kind"] = [$text, $alt, $wrong, ['romaji_mismatch'], $kind];
+            }
+        }
+
+        return $probes;
+    }
+
+    /**
+     * The alt_kind claim does not decide whether a mixed romaji/English alt is checked.
+     *
+     * @param  list<array{0: string, 1: string}>  $words
+     * @param  list<string>  $errors
+     */
+    #[DataProvider('mixedAltProbes')]
+    public function test_mixed_alt_is_checked_whatever_alt_kind_claims(string $text, string $alt, array $words, array $errors, string $altKind): void
     {
         $reference = $this->annotated('song', $text, implode('', array_column($words, 1)), $words, $alt, $altKind);
 
