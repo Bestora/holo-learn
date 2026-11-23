@@ -403,6 +403,18 @@ class VerifierTest extends TestCase
             'english title' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], 'translation', 'はなにぼうれい', []],
             'romaji claimed as none' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりん']], 'none', 'きゅうくらりん', []],
             'romaji claimed as none, wrong' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりい']], 'none', 'きゅうくらりい', ['kana_mismatch', 'romaji_mismatch']],
+            // Latin words repeated in the alt are removed from alt and reading before the comparison
+            'latin word in title' => ['Ahoy!! 我ら宝鐘海賊団☆', 'Ahoy!! Warera Houshou Kaizokudan☆', [['Ahoy', 'あほい'], ['我ら', 'われら'], ['宝鐘', 'ほうしょう'], ['海賊団', 'かいぞくだん']], 'romaji', 'あほいわれらほうしょうかいぞくだん', []],
+            'latin word in title, wrong' => ['Ahoy!! 我ら宝鐘海賊団☆', 'Ahoy!! Warera Houshou Kaizokudan☆', [['Ahoy', 'あほい'], ['我ら', 'われら'], ['宝鐘', 'ほしょう'], ['海賊団', 'かいぞくだん']], 'romaji', 'あほいわれらほしょうかいぞくだん', ['romaji_mismatch']],
+            'latin letter in title' => ['少女S', 'Shoujyo S', [['少女', 'しょうじょ'], ['S', 'えす']], 'romaji', 'しょうじょえす', []],
+            'latin letter in title, wrong' => ['少女S', 'Shoujyo S', [['少女', 'しょじょ'], ['S', 'えす']], 'romaji', 'しょじょえす', ['romaji_mismatch']],
+            'latin letter missing from romaji keeps its reading' => ['少女S', 'Shoujyo', [['少女', 'しょうじょ'], ['S', 'えす']], 'romaji', 'しょうじょえす', ['romaji_mismatch']],
+            'latin letter only in title' => ['S', 'S', [['S', 'えす']], 'romaji', 'えす', []],
+            // "love" is removed from the alt, which stays English: no check, as before
+            'latin word not repeated' => ['LOVE受信、ヒクツ発信', "I'm difficult, but love me", [['LOVE', 'らぶ'], ['受信', 'じゅしん'], ['ヒクツ', 'ひくつ'], ['発信', 'はっしん']], 'translation', 'らぶじゅしんひくつはっしん', []],
+            'latin word not repeated, wrong (unchecked)' => ['LOVE受信、ヒクツ発信', "I'm difficult, but love me", [['LOVE', 'らぶ'], ['受信', 'じゅうしん'], ['ヒクツ', 'ひくつ'], ['発信', 'はっしん']], 'translation', 'らぶじゅうしんひくつはっしん', []],
+            'l in romaji' => ['バラライカ', 'Balalaika', [['バラライカ', 'ばららいか']], 'romaji', 'ばららいか', []],
+            'l in romaji, wrong' => ['バラライカ', 'Balalaika', [['バラライカ', 'ばらいか']], 'romaji', 'ばらいか', ['kana_mismatch', 'romaji_mismatch']],
         ];
     }
 

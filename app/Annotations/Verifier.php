@@ -17,7 +17,7 @@ use Normalizer;
 class Verifier
 {
     /** Particles whose reading differs from their kana. */
-    private const PARTICLES = ['は' => 'わ', 'へ' => 'え', 'を' => 'お'];
+    public const PARTICLES = ['は' => 'わ', 'へ' => 'え', 'を' => 'お'];
 
     /** @return list<string> error codes, empty when verified */
     public function verify(Reference $ref): array
@@ -51,7 +51,7 @@ class Verifier
             $errors[] = 'kana_mismatch';
         }
 
-        $romajiOk = $this->romajiOk($ref, $annotation->reading_kana, $words, $annotation->alt_kind);
+        $romajiOk = $this->romajiOk($ref, $words, $annotation->alt_kind);
         if ($romajiOk === false) {
             $errors[] = 'romaji_mismatch';
         }
@@ -151,24 +151,13 @@ class Verifier
      * @param  list<array{surface: string, reading: string}>  $words
      * @return bool|null null when no romaji check applies
      */
-    private function romajiOk(Reference $ref, string $reading, array $words, string $altKind): ?bool
+    private function romajiOk(Reference $ref, array $words, string $altKind): ?bool
     {
         if ($ref->kind === 'name') {
             return NameRomaji::matches($ref->alt_text, $words);
         }
-        if ($ref->alt_text === null) {
-            return null;
-        }
 
-        // The alt_kind claim is not trusted: an alt that converts completely to kana is romaji.
-        $romaji = Kana::fromRomaji($ref->alt_text);
-        if ($altKind !== 'romaji' && ! Kana::isKanaOnly($romaji)) {
-            return null;
-        }
-        // romaji writes the particle words は/へ/を as spoken (wa/e/o)
-        $spoken = implode('', array_map(fn (array $w) => $w['surface'] === $w['reading'] ? (self::PARTICLES[$w['reading']] ?? $w['reading']) : $w['reading'], $words));
-
-        return Kana::matchesRomaji($reading, $romaji) || Kana::matchesRomaji($spoken, $romaji);
+        return SongRomaji::matches($ref->alt_text, $words, $altKind);
     }
 
     /**

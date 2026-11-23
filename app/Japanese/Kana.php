@@ -46,6 +46,8 @@ class Kana
         'fa' => 'ふぁ', 'fi' => 'ふぃ', 'fe' => 'ふぇ', 'fo' => 'ふぉ',
         'di' => 'でぃ', 'wi' => 'うぃ', 'we' => 'うぇ',
         'va' => 'ゔぁ', 'vi' => 'ゔぃ', 'vu' => 'ゔ', 've' => 'ゔぇ', 'vo' => 'ゔぉ',
+        'la' => 'ら', 'li' => 'り', 'lu' => 'る', 'le' => 'れ', 'lo' => 'ろ', // Balalaika
+        'lya' => 'りゃ', 'lyu' => 'りゅ', 'lyo' => 'りょ',
     ];
 
     /**
@@ -95,7 +97,7 @@ class Kana
             $next = $chars[$i + 1] ?? '';
 
             // Doubled consonant (and Hepburn "tch") → っ.
-            if (($c === $next && preg_match('/^[bcdfghjkpqrstvwxyz]$/', $c)) || ($c === 't' && $next === 'c')) {
+            if (($c === $next && preg_match('/^[bcdfghjklpqrstvwxyz]$/', $c)) || ($c === 't' && $next === 'c')) {
                 $out .= 'っ';
                 $i++;
 

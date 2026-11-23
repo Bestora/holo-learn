@@ -29,6 +29,7 @@ class KanaTest extends TestCase
     public static function toRomajiCases(): array
     {
         return [
+            ['ばららいか', 'bararaika'],
             // brief
             ['はなにぼうれい', 'hananibourei'],
             ['きゅうくらりん', 'kyuukurarin'],
@@ -96,6 +97,12 @@ class KanaTest extends TestCase
             ['nn', 'ん'],
             ['Kyu-123-Ku!', 'きゅく'],
             ['', ''],
+            // l as r
+            ['Balalaika', 'ばららいか'],
+            ['Lemon', 'れもん'],
+            ['la li lu le lo lya lyu lyo', 'らりるれろりゃりゅりょ'],
+            ['Ballo', 'ばっろ'],
+            ['Alice', 'ありcえ'],
         ];
     }
 
