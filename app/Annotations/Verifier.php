@@ -63,6 +63,7 @@ class Verifier
             $words[$i]['ok'] = match (true) {
                 isset($kanaOk[$i]) => $kanaOk[$i],
                 Kana::kanjiIn($word['surface']) === [] => false, // Latin, digits, symbols
+                ! self::fitsSkeleton($word['surface'], $word['reading']) => false,
                 $romajiOk === true && $ref->kind === 'name' => true,
                 default => $this->inDictionary($word, $dictionary),
             };
@@ -152,15 +153,37 @@ class Verifier
      */
     private function romajiOk(Reference $ref, string $reading, array $words, string $altKind): ?bool
     {
-        if ($ref->kind === 'song') {
-            if ($altKind !== 'romaji' || $ref->alt_text === null) {
-                return null;
-            }
-
-            return Kana::looselyEqual(Kana::fromRomaji($ref->alt_text), $reading);
+        if ($ref->kind === 'name') {
+            return NameRomaji::matches($ref->alt_text, $words);
+        }
+        if ($ref->alt_text === null) {
+            return null;
         }
 
-        return NameRomaji::matches($ref->alt_text, $words);
+        // The alt_kind claim is not trusted: an alt that converts completely to kana and is
+        // close to the reading is romaji, whatever the annotation says.
+        $romaji = Kana::loose(Kana::fromRomaji($ref->alt_text));
+        $loose = Kana::loose($reading);
+        $looksLikeRomaji = $romaji !== '' && Kana::isKanaOnly($romaji)
+            && self::distance($romaji, $loose) <= 0.4 * max(mb_strlen($romaji), mb_strlen($loose));
+
+        return $altKind === 'romaji' || $looksLikeRomaji ? $romaji === $loose : null;
+    }
+
+    /** Levenshtein distance on characters (PHP's levenshtein() counts bytes). */
+    private static function distance(string $a, string $b): int
+    {
+        $b = mb_str_split($b);
+        $previous = range(0, count($b));
+        foreach (mb_str_split($a) as $i => $ca) {
+            $current = [$i + 1];
+            foreach ($b as $j => $cb) {
+                $current[] = min($previous[$j + 1] + 1, $current[$j] + 1, $previous[$j] + ($ca === $cb ? 0 : 1));
+            }
+            $previous = $current;
+        }
+
+        return $previous[count($b)];
     }
 
     /**
@@ -194,12 +217,35 @@ class Verifier
             return false;
         }
 
-        // Conjugated form: the dictionary form must exist, share the kanji, and its stem
-        // must start the reading (歌う → 歌った ok; 来る → 来た fails, which is safe).
-        $stem = mb_substr($word['lemma_reading'], 0, -1);
+        // Conjugated form: the dictionary form must exist and share the kanji, and both
+        // readings minus their okurigana must be the same kanji reading
+        // (歌った/うたった ← 歌う/うたう ok; 来た/きた ← 来る/くる fails, which is safe).
+        $head = self::head($word['reading'], $word['surface']);
 
         return $hasReading($word['lemma'], $word['lemma_reading'], false)
             && Kana::kanjiIn($word['surface']) === Kana::kanjiIn($word['lemma'])
-            && $stem !== '' && str_starts_with($word['reading'], $stem);
+            && $head !== null && $head !== '' && $head === self::head($word['lemma_reading'], $word['lemma']);
+    }
+
+    /** $reading without the trailing kana of $surface, or null if it does not end with them. */
+    private static function head(string $reading, string $surface): ?string
+    {
+        $tail = Kana::toHiragana(preg_match('/['.Kana::KANA.']*$/u', $surface, $m) === 1 ? $m[0] : '');
+
+        return str_ends_with($reading, $tail) ? substr($reading, 0, strlen($reading) - strlen($tail)) : null;
+    }
+
+    /**
+     * Whether the reading keeps the surface's kana in place, each run of kanji/々 reading as
+     * one or more kana (駆ける/かける ok, 駆ける/かけ not).
+     */
+    private static function fitsSkeleton(string $surface, string $reading): bool
+    {
+        $pattern = '';
+        foreach (preg_split('/(['.Kana::KANJI.'々]+)/u', Kana::toHiragana($surface), -1, PREG_SPLIT_DELIM_CAPTURE | PREG_SPLIT_NO_EMPTY) ?: [] as $chunk) {
+            $pattern .= preg_match('/^['.Kana::KANJI.'々]/u', $chunk) === 1 ? '['.Kana::KANA.']+' : preg_quote($chunk, '/');
+        }
+
+        return preg_match('/^'.$pattern.'$/u', $reading) === 1;
     }
 }

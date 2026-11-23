@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Annotations\Decomposer;
 use App\Annotations\Importer;
 use App\Models\Annotation;
 use App\Models\Occurrence;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Schema;
 use PHPUnit\Framework\Attributes\DataProvider;
+use RuntimeException;
 use Tests\TestCase;
 
 class AnnotationRoundtripTest extends TestCase
@@ -284,6 +286,27 @@ class AnnotationRoundtripTest extends TestCase
         $this->assertStringContainsString('verified 1, rejected 0', Artisan::output());
         $this->assertSame('verified', $good->refresh()->status);
         $this->assertSame(1, $good->items()->count());
+    }
+
+    public function test_failing_decompose_rolls_back_verification(): void
+    {
+        $reference = $this->reference('song', '花に亡霊', $this->talent(1));
+        app(Importer::class)->import($this->line($reference));
+        $this->app->instance(Decomposer::class, new class extends Decomposer
+        {
+            public function decompose(Reference $ref): void
+            {
+                throw new RuntimeException('boom');
+            }
+        });
+
+        try {
+            Artisan::call('annotations:reverify');
+            $this->fail('exception expected');
+        } catch (RuntimeException) {
+        }
+
+        $this->assertSame('annotated', $reference->refresh()->status);
     }
 
     public function test_import_accepts_bom_and_crlf(): void

@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Annotations\Decomposer;
+use App\Annotations\Verifier;
 use App\Models\Item;
 use App\Models\Reference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 class DecomposerTest extends TestCase
@@ -227,6 +229,23 @@ class DecomposerTest extends TestCase
         app(Decomposer::class)->decompose($reference);
 
         $this->assertSame([], $this->links($reference->refresh()));
+    }
+
+    public function test_decompose_query_count_is_constant(): void
+    {
+        $reference = $this->annotated('song', '今日は花に亡霊を宇宙で歌った', 'きょうわはなにぼうれいおうちゅうでうたった', [
+            ['今日', 'きょう'], ['は', 'わ'], ['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい'], ['を', 'お'],
+            ['宇宙', 'うちゅう'], ['で', 'で'], ['歌った', 'うたった', '歌う', 'うたう'],
+        ]);
+        app(Verifier::class)->verify($reference);
+        $reference = Reference::query()->with('annotation')->findOrFail($reference->id);
+
+        DB::enableQueryLog();
+        app(Decomposer::class)->decompose($reference);
+
+        // detach, 2× dict_kanji, dict_words, find items, insert missing, find new, insert links
+        $this->assertLessThanOrEqual(8, count(DB::getQueryLog()));
+        $this->assertCount(8, $this->links($reference->refresh(), 'kanji'));
     }
 
     public function test_unknown_kanji_is_skipped(): void

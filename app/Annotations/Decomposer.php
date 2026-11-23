@@ -47,19 +47,71 @@ class Decomposer
     /** @return list<array{item_id: int, position: int, context_reading: ?string}> */
     private function rows(Reference $ref): array
     {
+        $wanted = []; // "kind|characters" => attributes for a new item, null = link only if it exists
+        $links = $this->links($ref, $wanted);
+        $items = $this->items($wanted);
+
+        $rows = [];
+        foreach ($links as [$key, $position, $context]) {
+            if (isset($items[$key])) {
+                $rows[] = ['item_id' => $items[$key]->id, 'position' => $position, 'context_reading' => $context];
+            }
+        }
+
+        return $rows;
+    }
+
+    /**
+     * Existing items for all wanted keys, missing non-kana ones created; 3 queries at most.
+     * Existing items keep their readings and meanings.
+     *
+     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * @return Collection<string, Item>
+     */
+    private function items(array $wanted): Collection
+    {
+        if ($wanted === []) {
+            return collect();
+        }
+        $find = function (array $keys) {
+            $pairs = array_map(fn (string $key) => explode('|', $key, 2), $keys);
+
+            return Item::query()->whereIn('kind', array_unique(array_column($pairs, 0)))->whereIn('characters', array_unique(array_column($pairs, 1)))
+                ->get()->toBase()->keyBy(fn (Item $item) => "{$item->kind}|{$item->characters}")->only($keys);
+        };
+
+        $items = $find(array_keys($wanted));
+        $missing = array_filter(array_diff_key($wanted, $items->all()));
+        if ($missing !== []) {
+            Item::query()->insertOrIgnore(array_map(function (string $key, array $attributes) {
+                [$kind, $characters] = explode('|', $key, 2);
+
+                return ['kind' => $kind, 'characters' => $characters, 'readings' => json_encode($attributes['readings'], JSON_UNESCAPED_UNICODE), 'meanings' => json_encode($attributes['meanings'], JSON_UNESCAPED_UNICODE)];
+            }, array_keys($missing), $missing));
+            $items = $items->merge($find(array_keys($missing)));
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * @return list<array{string, int, ?string}> [item key, position, context reading]
+     */
+    private function links(Reference $ref, array &$wanted): array
+    {
         $words = $ref->annotation->words ?? [];
         $aligned = Verifier::align($ref->text_ja, array_column($words, 'surface'));
         if ($aligned === null) {
             return []; // the verifier rejects this as surface_mismatch
         }
 
-        $chars = mb_str_split($ref->text_ja);
-        $kana = Item::query()->whereIn('kind', ['hiragana', 'katakana'])->whereIn('characters', array_unique($chars))
-            ->get()->keyBy('characters');
         $rows = [];
-        foreach ($chars as $position => $char) {
-            if (isset($kana[$char])) {
-                $rows[] = ['item_id' => $kana[$char]->id, 'position' => $position, 'context_reading' => null];
+        foreach (mb_str_split($ref->text_ja) as $position => $char) {
+            if (Kana::isKanaOnly($char)) {
+                $key = (Kana::toHiragana($char) === $char ? 'hiragana' : 'katakana').'|'.$char;
+                $wanted[$key] = null; // seeded kana only; small kana and ー have no item
+                $rows[] = [$key, $position, null];
             }
         }
 
@@ -69,7 +121,7 @@ class Decomposer
         }
 
         $dictKanji = $this->dictKanji($kanjiWords, $words);
-        $vocab = $ref->kind === 'name' ? collect() : $this->vocab($kanjiWords, $words);
+        $vocab = $ref->kind === 'name' ? [] : $this->vocab($kanjiWords, $words, $wanted);
 
         // names: a kanji carries the reading of its whole unit, so a wrong split inside a
         // unit (小/たか + 鳥遊/なし) cannot attach a per-word reading
@@ -88,14 +140,14 @@ class Decomposer
                 if ($kanji === null || Kana::kanjiIn($char) === []) {
                     continue; // unknown kanji, or kana/々 inside the word
                 }
-                $rows[] = ['item_id' => $this->item('kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings))->id, 'position' => $position, 'context_reading' => $kanjiReading];
+                $rows[] = [self::want($wanted, 'kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings)), $position, $kanjiReading];
                 foreach ($kanji->radicals as $radical) {
                     $source = $dictKanji[self::RADICAL_PARENTS[$radical] ?? ''] ?? $dictKanji[$radical] ?? null;
-                    $rows[] = ['item_id' => $this->item('radical', $radical, [], $source === null ? [] : self::meanings($source->meanings))->id, 'position' => $position, 'context_reading' => null];
+                    $rows[] = [self::want($wanted, 'radical', $radical, [], $source === null ? [] : self::meanings($source->meanings)), $position, null];
                 }
             }
             if (isset($vocab[$i])) {
-                $rows[] = ['item_id' => $vocab[$i]->id, 'position' => $aligned[$i][0][1], 'context_reading' => $reading];
+                $rows[] = [$vocab[$i], $aligned[$i][0][1], $reading];
             }
         }
 
@@ -126,9 +178,10 @@ class Decomposer
      *
      * @param  list<int>  $indexes
      * @param  list<array<string, mixed>>  $words
-     * @return array<int, Item>
+     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
+     * @return array<int, string> item key per word index
      */
-    private function vocab(array $indexes, array $words): array
+    private function vocab(array $indexes, array $words, array &$wanted): array
     {
         $spellings = array_merge(...array_map(fn ($i) => array_filter([$words[$i]['surface'], $words[$i]['lemma'] ?? null]), $indexes));
         $dictionary = DictWord::query()->whereIn('spelling', $spellings)->where('is_name', false)->orderBy('id')->get()->groupBy('spelling');
@@ -142,7 +195,7 @@ class Decomposer
                 if ($match !== null) {
                     $readings = array_values(array_unique($rows->map(fn (DictWord $w) => Kana::toHiragana($w->reading))->all()));
                     $meanings = array_slice(array_values(array_unique(array_merge(...$match->glosses))), 0, 5);
-                    $items[$i] = $this->item('vocab', $spelling, $readings, $meanings);
+                    $items[$i] = self::want($wanted, 'vocab', $spelling, $readings, $meanings);
 
                     break;
                 }
@@ -172,12 +225,15 @@ class Decomposer
     }
 
     /**
+     * @param  array<string, ?array{readings: list<string>, meanings: list<string>}>  $wanted
      * @param  list<string>  $readings
      * @param  list<string>  $meanings
      */
-    private function item(string $kind, string $characters, array $readings, array $meanings): Item
+    private static function want(array &$wanted, string $kind, string $characters, array $readings, array $meanings): string
     {
-        // existing items keep their readings and meanings
-        return Item::query()->firstOrCreate(['kind' => $kind, 'characters' => $characters], ['readings' => $readings, 'meanings' => $meanings]);
+        $key = "{$kind}|{$characters}";
+        $wanted[$key] ??= ['readings' => $readings, 'meanings' => $meanings];
+
+        return $key;
     }
 }

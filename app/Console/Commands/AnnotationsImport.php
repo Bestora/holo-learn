@@ -7,6 +7,7 @@ use App\Annotations\Importer;
 use App\Annotations\Verifier;
 use App\Models\Reference;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
 
 class AnnotationsImport extends Command
@@ -72,8 +73,13 @@ class AnnotationsImport extends Command
     {
         $verified = $rejected = 0;
         foreach ($references as $reference) {
-            $errors = $verifier->verify($reference);
-            $decomposer->decompose($reference);
+            // one transaction: a failing decompose must not leave a verified reference with stale links
+            $errors = DB::transaction(function () use ($reference, $verifier, $decomposer) {
+                $errors = $verifier->verify($reference);
+                $decomposer->decompose($reference);
+
+                return $errors;
+            });
             if ($errors === []) {
                 $verified++;
 

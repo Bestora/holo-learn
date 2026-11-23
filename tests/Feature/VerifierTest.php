@@ -3,9 +3,11 @@
 namespace Tests\Feature;
 
 use App\Annotations\Verifier;
+use App\Models\DictWord;
 use App\Models\Reference;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
+use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
 
 class VerifierTest extends TestCase
@@ -173,13 +175,13 @@ class VerifierTest extends TestCase
 
     public function test_name_romaji_ignores_name_order_and_english_style_kana(): void
     {
-        foreach (['Houshou Marine', 'Marine Houshou'] as $alt) {
-            Reference::query()->delete();
-            $reference = $this->annotated('name', '宝鐘マリン', 'ほうしょうまりん', [['宝鐘', 'ほうしょう'], ['マリン', 'まりん']], $alt, 'translation');
+        $reference = $this->annotated('name', '宝鐘マリン', 'ほうしょうまりん', [['宝鐘', 'ほうしょう'], ['マリン', 'まりん']], 'Houshou Marine', 'translation');
+        $this->assertSame([], $this->verify($reference));
+        $this->assertSame([true, true], $this->okFlags($reference));
 
-            $this->assertSame([], $this->verify($reference), $alt);
-            $this->assertSame([true, true], $this->okFlags($reference));
-        }
+        // reversed romaji order is no longer accepted
+        $reversed = $this->annotated('name', '宝鐘マリンx', 'ほうしょうまりん', [['宝鐘', 'ほうしょう'], ['マリン', 'まりん'], ['x', 'えっくす']], 'Marine Houshou');
+        $this->assertContains('romaji_mismatch', $this->verify($reversed));
     }
 
     public function test_name_with_swapped_readings_is_rejected(): void
@@ -218,16 +220,16 @@ class VerifierTest extends TestCase
         $this->assertSame([], $this->verify($oneWord));
     }
 
-    public function test_name_romaji_given_name_first(): void
+    public function test_name_romaji_given_name_first_is_rejected(): void
     {
         $reference = $this->annotated('name', '火威青', 'ひおどしあお', [['火威', 'ひおどし'], ['青', 'あお']], 'Ao Hiodoshi');
 
-        $this->assertSame([], $this->verify($reference));
+        $this->assertSame(['romaji_mismatch'], $this->verify($reference));
     }
 
     public function test_name_units_must_appear_in_order(): void
     {
-        $reference = $this->annotated('name', '花の亡霊', 'はなのぼうれい', [['花', 'はな'], ['の', 'の'], ['亡霊', 'ぼうれい']], 'Hana Bourei Hana');
+        $reference = $this->annotated('name', '花の亡霊', 'はなのぼうれい', [['花', 'はな'], ['の', 'の'], ['亡霊', 'ぼうれい']], 'Hana no Bourei');
         $this->assertSame([], $this->verify($reference));
 
         $overlap = $this->annotated('name', '花の花', 'はなのはな', [['花', 'はな'], ['の', 'の'], ['花', 'はな']], 'Hana');
@@ -265,6 +267,118 @@ class VerifierTest extends TestCase
         $this->assertSame([], $this->verify($ok));
         $this->assertSame(['romaji_mismatch'], $this->verify($bad));
         $this->assertSame([], $this->verify($translation));
+    }
+
+    /** @return array<string, array{string, string, list<array{0: string, 1: string}>, list<string>}> */
+    public static function nameProbes(): array
+    {
+        $rejected = ['romaji_mismatch'];
+
+        return [
+            'missing part, one word' => ['水宮枢', 'Mizumiya Su', [['水宮枢', 'みずみや']], $rejected],
+            'family name dropped' => ['輪堂千速', 'Rindo Chihaya', [['輪堂千速', 'ちはや']], $rejected],
+            'reading in reverse order' => ['火威青', 'Hiodoshi Ao', [['火威青', 'あおひおどし']], $rejected],
+            'parts swapped across words' => ['水宮枢', 'Mizumiya Su', [['水宮', 'す'], ['枢', 'みずみや']], $rejected],
+            'partial part' => ['宝鐘マリン', 'Houshou Marine', [['宝鐘', 'しょう'], ['マリン', 'まりん']], $rejected],
+            'prefix of a part' => ['湊あくあ', 'Minato Aqua', [['湊', 'みな'], ['あくあ', 'あくあ']], $rejected],
+            'part with dropped kana' => ['綺々羅々ヴィヴィ', 'Kikirara Vivi', [['綺々羅々', 'きらら'], ['ヴィヴィ', 'ゔぃゔぃ']], $rejected],
+            'swapped readings' => ['桃鈴ねね', 'Momosuzu Nene', [['桃', 'すず'], ['鈴', 'もも'], ['ねね', 'ねね']], $rejected],
+            'momosuzu' => ['桃鈴ねね', 'Momosuzu Nene', [['桃鈴', 'ももすず'], ['ねね', 'ねね']], []],
+            'houshou' => ['宝鐘マリン', 'Houshou Marine', [['宝鐘', 'ほうしょう'], ['マリン', 'まりん']], []],
+            'takanashi' => ['小鳥遊キアラ', 'Takanashi Kiara', [['小鳥遊', 'たかなし'], ['キアラ', 'きあら']], []],
+            'takanashi wrong inner split' => ['小鳥遊キアラ', 'Takanashi Kiara', [['小', 'たか'], ['鳥遊', 'なし'], ['キアラ', 'きあら']], []],
+            'ina two words' => ['一伊那尓栖', "Ninomae Ina'nis", [['一', 'にのまえ'], ['伊那尓栖', 'いなにす']], []],
+            'ina one word' => ['一伊那尓栖', "Ninomae Ina'nis", [['一伊那尓栖', 'にのまえいなにす']], []],
+            'chloe' => ['沙花叉クロヱ', 'Sakamata Chloe', [['沙花叉', 'さかまた'], ['クロヱ', 'くろえ']], []],
+            'sana one word' => ['九十九佐命', 'Tsukumo Sana', [['九十九佐命', 'つくもさな']], []],
+            'sana two words' => ['九十九佐命', 'Tsukumo Sana', [['九十九', 'つくも'], ['佐命', 'さな']], []],
+            'ririka' => ['一条莉々華', 'Ichijou Ririka', [['一条莉々華', 'いちじょうりりか']], []],
+            'ao' => ['火威青', 'Hiodoshi Ao', [['火威', 'ひおどし'], ['青', 'あお']], []],
+            'calliope' => ['森カリオペ', 'Mori Calliope', [['森', 'もり'], ['カリオペ', 'かりおぺ']], []],
+            'suisei' => ['星街すいせい', 'Hoshimachi Suisei', [['星街', 'ほしまち'], ['すいせい', 'すいせい']], []],
+            'no kanji' => ['ラプラス・ダークネス', 'La+ Darknesss', [['ラプラス', 'らぷらす'], ['・ダークネス', 'だーくねす']], []],
+        ];
+    }
+
+    /**
+     * @param  list<array{0: string, 1: string}>  $words
+     * @param  list<string>  $errors
+     */
+    #[DataProvider('nameProbes')]
+    public function test_name_probes(string $text, string $alt, array $words, array $errors): void
+    {
+        $reference = $this->annotated('name', $text, implode('', array_column($words, 1)), $words, $alt);
+
+        $this->assertSame($errors, $this->verify($reference));
+    }
+
+    public function test_wrong_inner_split_carries_unit_reading(): void
+    {
+        $reference = $this->annotated('name', '小鳥遊キアラ', 'たかなしきあら', [['小', 'たか'], ['鳥遊', 'なし'], ['キアラ', 'きあら']], 'Takanashi Kiara');
+
+        $this->verify($reference);
+
+        $this->assertSame(['kanji:小@0=たかなし', 'kanji:遊@2=たかなし', 'kanji:鳥@1=たかなし'], $this->links($reference, 'kanji'));
+    }
+
+    /** @return array<string, array{string, list<array{0: string, 1: string, 2?: string, 3?: string}>, bool}> */
+    public static function lemmaProbes(): array
+    {
+        return [
+            'lemma reading as surface reading' => ['歌った', [['歌った', 'うたう', '歌う', 'うたう']], false],
+            'stem with extra kana' => ['行った', [['行った', 'いきった', '行く', 'いく']], false],
+            'adjective lemma reading' => ['女々しくて', [['女々しくて', 'めめしい', '女々しい', 'めめしい']], false],
+            'past tense' => ['歌った', [['歌った', 'うたった', '歌う', 'うたう']], true],
+            'sound change' => ['行った', [['行った', 'いった', '行く', 'いく']], true],
+            'adjective te form' => ['女々しくて', [['女々しくて', 'めめしくて', '女々しい', 'めめしい']], true],
+            'dictionary path with okurigana' => ['駆ける', [['駆ける', 'かける']], true],
+            'irregular verb' => ['来た', [['来た', 'きた', '来る', 'くる']], false],
+            // ponytail: known miss: a wrong lemma with the same kanji and stem is accepted (出す is right)
+            'wrong lemma with same stem' => ['出した', [['出した', 'でした', '出る', 'でる']], true],
+        ];
+    }
+
+    /** @param list<array{0: string, 1: string, 2?: string, 3?: string}> $words */
+    #[DataProvider('lemmaProbes')]
+    public function test_lemma_probes(string $text, array $words, bool $ok): void
+    {
+        $reference = $this->annotated('song', $text, implode('', array_column($words, 1)), $words);
+
+        $this->assertSame([], $this->verify($reference));
+        $this->assertSame([$ok], $this->okFlags($reference));
+    }
+
+    public function test_dictionary_reading_must_fit_the_kana_skeleton(): void
+    {
+        DictWord::query()->forceCreate(['spelling' => '駆ける', 'reading' => 'かけ', 'glosses' => [['broken row']], 'is_name' => false]);
+        $reference = $this->annotated('song', '駆ける', 'かけ', [['駆ける', 'かけ']]);
+
+        $this->assertSame([], $this->verify($reference));
+        $this->assertSame([false], $this->okFlags($reference));
+    }
+
+    /** @return array<string, array{string, string, list<array{0: string, 1: string}>, string, string, list<string>}> */
+    public static function songRomajiProbes(): array
+    {
+        return [
+            'romaji claimed as translation' => ['女々しくて', 'Memeshikute', [['女々しくて', 'めめしい']], 'translation', 'めめしい', ['romaji_mismatch']],
+            'english translation' => ['嘘ミーム', 'Fake Meme', [['嘘', 'うそ'], ['ミーム', 'みーむ']], 'translation', 'うそみーむ', []],
+            'english title' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], 'translation', 'はなにぼうれい', []],
+            'romaji claimed as none' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりん']], 'none', 'きゅうくらりん', []],
+            'romaji claimed as none, wrong' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりい']], 'none', 'きゅうくらりい', ['kana_mismatch', 'romaji_mismatch']],
+        ];
+    }
+
+    /**
+     * @param  list<array{0: string, 1: string}>  $words
+     * @param  list<string>  $errors
+     */
+    #[DataProvider('songRomajiProbes')]
+    public function test_song_romaji_probes(string $text, string $alt, array $words, string $altKind, string $reading, array $errors): void
+    {
+        $reference = $this->annotated('song', $text, $reading, $words, $alt, $altKind);
+
+        $this->assertSame($errors, $this->verify($reference));
     }
 
     public function test_missing_annotation_changes_nothing(): void

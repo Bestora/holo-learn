@@ -6,21 +6,25 @@ use App\Japanese\Kana;
 
 /**
  * Checks the readings of a name's kanji against its romaji. Consecutive words with kanji
- * form a unit; every unit must occur in the romaji in text order without overlap, with the
- * romaji parts in given or reversed order. Pure, no database.
+ * form a unit; each unit must equal one or more consecutive whole romaji parts, in text
+ * order. Parts left over may only stand where kana words are (English-style kana such as
+ * Marine for マリン never matches), and every such gap must leave a part. Pure, no database.
  */
 class NameRomaji
 {
     /**
      * @param  list<array{surface: string, reading: string}>  $words
-     * @return bool|null null when the name has no kanji (English-style kana such as Marine for マリン would never match)
+     * @return bool|null null when the name has no kanji
      */
     public static function matches(?string $alt, array $words): ?bool
     {
-        $units = [];
+        $units = [];   // reading per unit, in text order
+        $fillers = []; // gap index (0 = before the first unit) => has non-kanji words
         foreach (self::units($words) as $i => $unit) {
-            if ($unit !== null) {
-                $units[$unit][] = $words[$i]['reading'];
+            if ($unit === null) {
+                $fillers[count($units)] = true;
+            } else {
+                $units[$unit] = ($units[$unit] ?? '').$words[$i]['reading'];
             }
         }
         if ($units === []) {
@@ -30,22 +34,55 @@ class NameRomaji
             return false;
         }
 
-        $parts = array_map(fn (string $part) => Kana::fromRomaji(self::completeRomaji($part)), preg_split('/\s+/u', trim($alt)) ?: []);
-        // loose() collapses えい across word borders (にのまえ|いなにす), so both sides are
-        // compared per word/part and as a whole
-        $candidates = array_map(fn (array $readings) => array_unique([implode('', array_map(Kana::loose(...), $readings)), Kana::loose(implode('', $readings))]), $units);
+        $parts = array_values(array_filter(
+            array_map(fn (string $part) => Kana::fromRomaji(self::completeRomaji($part)), preg_split('/\s+/u', trim($alt)) ?: []),
+            fn (string $kana) => $kana !== '',
+        ));
 
-        // ponytail: substring match within a romaji part can still accept a wrong reading that
-        // happens to be contained in it; only in-order, non-overlapping placement is enforced.
-        foreach ([$parts, array_reverse($parts)] as $order) {
-            foreach ([implode('', array_map(Kana::loose(...), $order)), Kana::loose(implode('', $order))] as $romaji) {
-                if (self::inOrder($candidates, $romaji)) {
+        return self::place(array_values($units), $fillers, $parts, 0, 0);
+    }
+
+    /**
+     * Whether units $j.. can consume whole parts from $p on, honouring the gap rules.
+     *
+     * @param  list<string>  $units
+     * @param  array<int, bool>  $fillers
+     * @param  list<string>  $parts
+     */
+    private static function place(array $units, array $fillers, array $parts, int $j, int $p): bool
+    {
+        $n = count($parts);
+        $gapHasFiller = $fillers[$j] ?? false;
+        if ($j === count($units)) {
+            return $gapHasFiller ? $p < $n : $p === $n;
+        }
+
+        // a gap with kana words leaves at least one part, a gap without leaves none
+        for ($a = $gapHasFiller ? $p + 1 : $p; $a < $n; $a++) {
+            for ($b = $a; $b < $n; $b++) {
+                if (self::equals($units[$j], array_slice($parts, $a, $b - $a + 1)) && self::place($units, $fillers, $parts, $j + 1, $b + 1)) {
                     return true;
                 }
+            }
+            if (! $gapHasFiller) {
+                break;
             }
         }
 
         return false;
+    }
+
+    /**
+     * loose() collapses えい across part borders (にのまえ|いなにす), so the parts are
+     * compared both as a whole and part by part.
+     *
+     * @param  list<string>  $parts
+     */
+    private static function equals(string $reading, array $parts): bool
+    {
+        $loose = Kana::loose($reading);
+
+        return $loose !== '' && ($loose === Kana::loose(implode('', $parts)) || $loose === implode('', array_map(Kana::loose(...), $parts)));
     }
 
     /**
@@ -77,31 +114,5 @@ class NameRomaji
         $syllables = ['s' => 'su', 'k' => 'ku', 'l' => 'ru', 'r' => 'ru', 'm' => 'mu', 'z' => 'zu', 'b' => 'bu', 'p' => 'pu', 'g' => 'gu', 'f' => 'fu', 't' => 'to', 'd' => 'do'];
 
         return preg_replace_callback('/([sklrmzbpgftd])[^\p{L}]*$/iu', fn (array $m) => $syllables[strtolower($m[1])], $part) ?? $part;
-    }
-
-    /**
-     * Whether every unit occurs in $romaji, in order and without overlap; each unit may
-     * match in any of its candidate spellings (earliest end wins, which is optimal).
-     *
-     * @param  array<int, array<string>>  $units
-     */
-    private static function inOrder(array $units, string $romaji): bool
-    {
-        $offset = 0;
-        foreach ($units as $candidates) {
-            $end = null;
-            foreach ($candidates as $candidate) {
-                $at = $candidate === '' ? false : strpos($romaji, $candidate, $offset);
-                if ($at !== false && ($end === null || $at + strlen($candidate) < $end)) {
-                    $end = $at + strlen($candidate);
-                }
-            }
-            if ($end === null) {
-                return false;
-            }
-            $offset = $end;
-        }
-
-        return true;
     }
 }
