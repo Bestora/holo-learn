@@ -402,7 +402,8 @@ class VerifierTest extends TestCase
             'kyou as konnichi' => ['今日', 'Kyou', [['今日', 'こんにち']], 'translation', 'こんにち', ['romaji_mismatch']],
             'english title' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], 'translation', 'はなにぼうれい', []],
             'romaji claimed as none' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりん']], 'none', 'きゅうくらりん', []],
-            'romaji claimed as none, wrong' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりい']], 'none', 'きゅうくらりい', ['kana_mismatch', 'romaji_mismatch']],
+            // no kanji word: kana_mismatch alone guards the readings, no romaji check
+            'romaji claimed as none, wrong' => ['きゅうくらりん', 'Kyu-Kurarin', [['きゅうくらりん', 'きゅうくらりい']], 'none', 'きゅうくらりい', ['kana_mismatch']],
             // Latin words repeated in the alt are removed from alt and reading before the comparison
             'latin word in title' => ['Ahoy!! 我ら宝鐘海賊団☆', 'Ahoy!! Warera Houshou Kaizokudan☆', [['Ahoy', 'あほい'], ['我ら', 'われら'], ['宝鐘', 'ほうしょう'], ['海賊団', 'かいぞくだん']], 'romaji', 'あほいわれらほうしょうかいぞくだん', []],
             'latin word in title, wrong' => ['Ahoy!! 我ら宝鐘海賊団☆', 'Ahoy!! Warera Houshou Kaizokudan☆', [['Ahoy', 'あほい'], ['我ら', 'われら'], ['宝鐘', 'ほしょう'], ['海賊団', 'かいぞくだん']], 'romaji', 'あほいわれらほしょうかいぞくだん', ['romaji_mismatch']],
@@ -465,6 +466,9 @@ class VerifierTest extends TestCase
             // a wildcard takes one token only, so it cannot eat the first token of a split kanji word
             'wildcard takes part of a split kanji word' => ['サイダー初恋', 'Saida Hatsu Koi', [['サイダー', 'さいだー'], ['初恋', 'こい']], $rejected],
             'split kanji word after a wildcard' => ['サイダー初恋', 'Cider Hatsu Koi', [['サイダー', 'さいだー'], ['初恋', 'はつこい']], []],
+            // titles without a kanji word skip the romaji check
+            'kana-only title over three tokens' => ['ウォーアイニー', 'Woh I Nee', [['ウォーアイニー', 'うぉーあいにー']], []],
+            'kana-only title, converting translation' => ['ロッタラ ロッタラ', 'Lotta Love, Lotta Love', [['ロッタラ', 'ろったら'], ['ロッタラ', 'ろったら']], [], 'translation'],
             'translation is no romaji' => ['花に亡霊', 'Ghost In A Flower', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']], [], 'translation'],
             // a kanji word must always be matched by romaji tokens
             'kakumei wrong' => ['プライド革命', 'Pride Kakumei', [['プライド', 'ぷらいど'], ['革命', 'かくべい']], $rejected],

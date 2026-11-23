@@ -24,7 +24,8 @@ class SongRomaji
      */
     public static function matches(?string $alt, array $words, string $altKind): ?bool
     {
-        if ($alt === null) {
+        // only kanji readings need the romaji: kana_mismatch already ties kana words to their surface
+        if ($alt === null || array_filter($words, fn (array $w) => Kana::kanjiIn($w['surface']) !== []) === []) {
             return null;
         }
 
