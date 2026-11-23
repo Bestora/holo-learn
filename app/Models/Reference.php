@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Table;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Normalizer;
 use RuntimeException;
 
@@ -62,6 +63,18 @@ class Reference extends Model
     public function occurrences(): HasMany
     {
         return $this->hasMany(Occurrence::class);
+    }
+
+    /** @return BelongsToMany<Talent, $this> */
+    public function talents(): BelongsToMany
+    {
+        return $this->belongsToMany(Talent::class, 'occurrences');
+    }
+
+    /** @return HasOne<Annotation, $this> */
+    public function annotation(): HasOne
+    {
+        return $this->hasOne(Annotation::class);
     }
 
     /** @return BelongsToMany<Item, $this> */
