@@ -82,11 +82,14 @@ class InvitationTest extends TestCase
         // Another registration consumes the last use between our read and our increment.
         Invitation::retrieved(fn (Invitation $i) => Invitation::whereKey($i->id)->update(['uses' => 1]));
 
-        $this->post('/register', $this->validUserData() + ['invite' => 'abc'])
-            ->assertSessionHasErrors(['invite' => 'This invitation is invalid or has already been used.']);
+        try {
+            $this->post('/register', $this->validUserData() + ['invite' => 'abc'])
+                ->assertSessionHasErrors(['invite' => 'This invitation is invalid or has already been used.']);
 
-        $this->assertSame(0, User::count());
-        Invitation::flushEventListeners();
+            $this->assertSame(0, User::count());
+        } finally {
+            Invitation::flushEventListeners();
+        }
     }
 
     public function test_rejects_a_used_invite()

@@ -76,11 +76,51 @@ class AnswerCheckerTest extends TestCase
         $this->assertFalse(AnswerChecker::reading('tsutsuku', ['つづく']));
     }
 
-    public function test_kana_items_stay_loose_in_romaji(): void
+    public function test_kana_items_accept_each_romaji_spelling_of_the_kana_only(): void
     {
         $this->assertTrue(AnswerChecker::reading('zu', ['zu'])); // づ
         $this->assertTrue(AnswerChecker::reading('dzu', ['zu']));
         $this->assertTrue(AnswerChecker::reading('ji', ['ji'])); // ぢ
+        $this->assertTrue(AnswerChecker::reading('hu', ['fu']));
+        $this->assertTrue(AnswerChecker::reading('nn', ['n']));
+        $this->assertTrue(AnswerChecker::reading('n', ['n']));
+        $this->assertTrue(AnswerChecker::reading('ko', ['ko']));
+        $this->assertFalse(AnswerChecker::reading('kou', ['ko']));
+        $this->assertFalse(AnswerChecker::reading('koo', ['ko']));
+        $this->assertFalse(AnswerChecker::reading('ko-', ['ko']));
+        $this->assertFalse(AnswerChecker::reading('こう', ['ko']));
+    }
+
+    /** @return array<string, array{string, string}> */
+    public static function macronInputs(): array
+    {
+        return [
+            'ō as oo' => ['ōkii', 'おおきい'],
+            'ō as oo (tōri)' => ['tōri', 'とおり'],
+            'ō as ou' => ['tōkyō', 'とうきょう'],
+            'ō and ī as ー' => ['kōhī', 'こーひー'],
+            'ō as ー' => ['bōru', 'ぼーる'],
+            'ē as ei' => ['sensē', 'せんせい'],
+            'ā as ー' => ['rāmen', 'らーめん'],
+            'ū as uu' => ['jū', 'じゅう'],
+            'capital macron' => ['Tōkyō', 'とうきょう'],
+        ];
+    }
+
+    #[DataProvider('macronInputs')]
+    public function test_a_macron_stands_for_any_spelling_of_its_long_vowel(string $input, string $reading): void
+    {
+        $this->assertTrue(AnswerChecker::reading($input, [$reading]));
+    }
+
+    public function test_without_macrons_long_vowels_stay_strict(): void
+    {
+        $this->assertFalse(AnswerChecker::reading('tookyoo', ['とうきょう']));
+        $this->assertFalse(AnswerChecker::reading('tokyo', ['とうきょう']));
+        $this->assertFalse(AnswerChecker::reading('kouhii', ['こーひー']));
+        $this->assertFalse(AnswerChecker::reading('tōkyo', ['とうきょう'])); // a macron covers its own vowel only
+        $this->assertFalse(AnswerChecker::reading('ōkii', ['おかしい']));
+        $this->assertFalse(AnswerChecker::reading(str_repeat('ō', 40), ['おう'])); // no 3^40 spellings
     }
 
     public function test_empty_reading_is_wrong(): void

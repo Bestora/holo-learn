@@ -8,9 +8,9 @@ use App\Japanese\Kana;
 class AnswerChecker
 {
     /**
-     * Kana items (Hepburn expected) compare loosely; readings exactly, so a wrong long vowel
-     * (しゅじん for しゅうじん) is wrong. Only ー equals the same vowel repeated (こーひー = こおひい),
-     * and romaji, which cannot tell づ/ぢ from ず/じ, gets those two pairs merged.
+     * Exact, so a wrong long vowel (しゅじん for しゅうじん, kou for こ) is wrong. Only ー equals the
+     * same vowel repeated (こーひー = こおひい); romaji, which cannot tell づ/ぢ from ず/じ, gets those
+     * two pairs merged, and a macron may stand for any spelling of its long vowel (ō: ou, oo, o-).
      *
      * @param  list<string>  $expected  kana readings, or Hepburn romaji for kana items
      */
@@ -22,19 +22,40 @@ class AnswerChecker
         }
 
         $compact = mb_strtolower(preg_replace('/\s+/u', '', $input) ?? '');
-        $kana = self::asKana($compact);
-        $romaji = $kana !== $compact;
+        $romaji = self::asKana($compact) !== $compact;
+        $inputs = array_map(fn (string $spelling) => self::exactKey(self::asKana($spelling), $romaji), self::macronSpellings($compact));
+        // kana items expect Hepburn: any romaji spelling of that kana (shi/si, fu/hu, n/nn), nothing longer
+        $kanaItemInputs = array_map(fn (string $spelling) => self::exactKey(self::asKana($spelling), true), self::macronSpellings($compact));
 
         foreach ($expected as $reading) {
             $matches = preg_match('/[a-z]/i', $reading) === 1
-                ? $compact === mb_strtolower($reading) || Kana::looselyEqual($kana, self::asKana($reading))
-                : self::exactKey($kana, $romaji) === self::exactKey($reading, $romaji);
+                ? in_array(self::exactKey(self::asKana(mb_strtolower($reading)), true), $kanaItemInputs, true)
+                : in_array(self::exactKey($reading, $romaji), $inputs, true);
             if ($matches) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Every spelling a macron answer may mean (kōhī: kouhii, koohii, ko-hii, …); without macrons only itself.
+     *
+     * @return list<string>
+     */
+    private static function macronSpellings(string $romaji): array
+    {
+        $options = ['ā' => ['aa', 'a-'], 'ī' => ['ii', 'i-'], 'ū' => ['uu', 'u-'], 'ē' => ['ei', 'ee', 'e-'], 'ō' => ['ou', 'oo', 'o-']];
+        if (preg_match_all('/[āīūēō]/u', $romaji) > 6) {
+            return [$romaji]; // 3^n spellings: no answer has that many long vowels
+        }
+        $spellings = [''];
+        foreach (mb_str_split($romaji) as $char) {
+            $spellings = array_merge(...array_map(fn (string $s) => array_map(fn (string $o) => $s.$o, $options[$char] ?? [$char]), $spellings));
+        }
+
+        return $spellings;
     }
 
     /** Hiragana with every ー spelled as the vowel before it; づ/ぢ as ず/じ when compared with romaji. */
