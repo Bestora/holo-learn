@@ -8,7 +8,8 @@ use App\Http\Controllers\OccurrenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
-Route::inertia('datenschutz', 'privacy')->name('privacy');
+Route::inertia('privacy', 'privacy')->name('privacy');
+Route::permanentRedirect('datenschutz', '/privacy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');

@@ -57,11 +57,11 @@ export default function TwoFactorRecoveryCodes({
             <CardHeader>
                 <CardTitle className="flex gap-3">
                     <LockKeyhole className="size-4" aria-hidden="true" />
-                    2FA-Wiederherstellungscodes
+                    2FA recovery codes
                 </CardTitle>
                 <CardDescription>
-                    Damit kommst du wieder in dein Konto, falls dein 2FA-Gerät
-                    weg ist. Bewahre sie in einem Passwort-Manager auf.
+                    Recovery codes let you regain access if you lose your 2FA
+                    device. Store them in a secure password manager.
                 </CardDescription>
             </CardHeader>
             <CardContent>
@@ -76,9 +76,7 @@ export default function TwoFactorRecoveryCodes({
                             className="size-4"
                             aria-hidden="true"
                         />
-                        {codesAreVisible
-                            ? 'Codes ausblenden'
-                            : 'Codes anzeigen'}
+                        {codesAreVisible ? 'Hide' : 'View'} recovery codes
                     </Button>
 
                     {canRegenerateCodes && (
@@ -94,7 +92,7 @@ export default function TwoFactorRecoveryCodes({
                                     disabled={processing}
                                     aria-describedby="regenerate-warning"
                                 >
-                                    <RefreshCw /> Neue Codes erzeugen
+                                    <RefreshCw /> Regenerate codes
                                 </Button>
                             )}
                         </Form>
@@ -114,7 +112,7 @@ export default function TwoFactorRecoveryCodes({
                                     ref={codesSectionRef}
                                     className="grid gap-1 rounded-lg bg-muted p-4 font-mono text-sm"
                                     role="list"
-                                    aria-label="Wiederherstellungscodes"
+                                    aria-label="Recovery codes"
                                 >
                                     {recoveryCodesList.length ? (
                                         recoveryCodesList.map((code, index) => (
@@ -129,7 +127,7 @@ export default function TwoFactorRecoveryCodes({
                                     ) : (
                                         <div
                                             className="space-y-2"
-                                            aria-label="Codes werden geladen"
+                                            aria-label="Loading recovery codes"
                                         >
                                             {Array.from(
                                                 { length: 8 },
@@ -147,12 +145,13 @@ export default function TwoFactorRecoveryCodes({
 
                                 <div className="text-xs text-muted-foreground select-none">
                                     <p id="regenerate-warning">
-                                        Jeder Code funktioniert genau einmal.
-                                        Brauchst du mehr, wähle oben{' '}
+                                        Each recovery code can be used once to
+                                        access your account and will be removed
+                                        after use. If you need more, click{' '}
                                         <span className="font-bold">
-                                            Neue Codes erzeugen
-                                        </span>
-                                        .
+                                            Regenerate codes
+                                        </span>{' '}
+                                        above.
                                     </p>
                                 </div>
                             </>

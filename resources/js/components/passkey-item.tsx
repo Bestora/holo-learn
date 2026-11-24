@@ -68,23 +68,22 @@ export default function PasskeyItem({ passkey, onDelete }: Props) {
                     </Button>
                 </DialogTrigger>
                 <DialogContent>
-                    <DialogTitle>Passkey entfernen</DialogTitle>
+                    <DialogTitle>Remove passkey</DialogTitle>
                     <DialogDescription>
-                        Passkey „{passkey.name}“ wirklich entfernen? Du kannst
-                        dich dann nicht mehr damit anmelden.
+                        Are you sure you want to remove the "{passkey.name}"
+                        passkey? You will no longer be able to use it to sign
+                        in.
                     </DialogDescription>
                     <DialogFooter className="gap-2">
                         <DialogClose asChild>
-                            <Button variant="secondary">Abbrechen</Button>
+                            <Button variant="secondary">Cancel</Button>
                         </DialogClose>
                         <Button
                             variant="destructive"
                             onClick={handleDelete}
                             disabled={isDeleting}
                         >
-                            {isDeleting
-                                ? 'Wird entfernt …'
-                                : 'Passkey entfernen'}
+                            {isDeleting ? 'Removing...' : 'Remove passkey'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

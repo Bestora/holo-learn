@@ -25,7 +25,8 @@ class PagesTest extends TestCase
 
     public function test_privacy_page_is_public(): void
     {
-        $this->get('/datenschutz')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('privacy'));
+        $this->get('/privacy')->assertOk()->assertInertia(fn (AssertableInertia $page) => $page->component('privacy'));
+        $this->get('/datenschutz')->assertRedirect('/privacy');
         $this->actingAs(User::factory()->create())->get(route('privacy'))->assertOk();
     }
 
@@ -60,10 +61,10 @@ class PagesTest extends TestCase
         $footer = (string) file_get_contents(resource_path('js/components/app-footer.tsx'));
 
         foreach ([
-            'Inoffizielles Fanprojekt, nicht mit COVER Corp. verbunden.',
-            'Inhalte © COVER Corp. / jeweilige Rechteinhaber.',
-            'Wörterbuchdaten: JMdict, JMnedict, KANJIDIC2, KRADFILE © EDRDG (CC BY-SA 4.0).',
-            'Daten: Holodex.',
+            'Unofficial fan project, not affiliated with COVER Corp.',
+            'Content © COVER Corp. / respective rights holders.',
+            'Dictionary data: JMdict, JMnedict, KANJIDIC2, KRADFILE © EDRDG (CC BY-SA 4.0).',
+            'Data: Holodex.',
             'https://github.com/Bestora/holo-learn',
             'privacy()',
         ] as $text) {

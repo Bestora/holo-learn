@@ -32,11 +32,11 @@ class FavoriteController extends Controller
             'talent_ids' => ['present', 'array'],
             'talent_ids.*' => ['integer', 'distinct', Rule::exists(Talent::class, 'id')->where('is_secondary', false)],
         ], [
-            'talent_ids.present' => 'Es fehlt die Auswahl.',
-            'talent_ids.array' => 'Die Auswahl muss eine Liste sein.',
-            'talent_ids.*.integer' => 'Ungültiges Talent.',
-            'talent_ids.*.distinct' => 'Ein Talent ist doppelt ausgewählt.',
-            'talent_ids.*.exists' => 'Dieses Talent kann nicht Favorit werden.',
+            'talent_ids.present' => 'The selection is missing.',
+            'talent_ids.array' => 'The selection must be a list.',
+            'talent_ids.*.integer' => 'Invalid talent.',
+            'talent_ids.*.distinct' => 'A talent is selected twice.',
+            'talent_ids.*.exists' => 'This talent cannot be a favorite.',
         ]);
 
         $request->user()->favorites()->sync($data['talent_ids']);

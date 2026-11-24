@@ -49,10 +49,10 @@ class LearnController extends Controller
     }
 
     private const MESSAGES = [
-        'item_id.required' => 'Es fehlt die Karte.',
-        'item_id.integer' => 'Ungültige Karte.',
-        'answer.present' => 'Es fehlt die Antwort.',
-        'answer.string' => 'Die Antwort muss Text sein.',
-        'answer.max' => 'Die Antwort ist zu lang.',
+        'item_id.required' => 'The card is missing.',
+        'item_id.integer' => 'Invalid card.',
+        'answer.present' => 'The answer is missing.',
+        'answer.string' => 'The answer must be text.',
+        'answer.max' => 'The answer is too long.',
     ];
 }

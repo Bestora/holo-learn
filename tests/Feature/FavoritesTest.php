@@ -71,7 +71,7 @@ class FavoritesTest extends TestCase
 
         $this->putJson(route('favorites.update'), ['talent_ids' => [999]])->assertStatus(422)->assertJsonValidationErrors(['talent_ids.0']);
         $this->putJson(route('favorites.update'), ['talent_ids' => [$ok->id, $secondary->id]])->assertStatus(422)
-            ->assertJsonPath('errors', ['talent_ids.1' => ['Dieses Talent kann nicht Favorit werden.']]);
+            ->assertJsonPath('errors', ['talent_ids.1' => ['This talent cannot be a favorite.']]);
         $this->putJson(route('favorites.update'), [])->assertStatus(422)->assertJsonValidationErrors(['talent_ids']);
         $this->assertSame([$ok->id], $user->favorites()->pluck('talents.id')->all());
     }

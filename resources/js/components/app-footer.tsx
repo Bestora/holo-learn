@@ -3,10 +3,10 @@ import { privacy } from '@/routes';
 
 // Notices required on every page (see PagesTest); string literals so formatting cannot split them.
 const NOTICE = [
-    'Inoffizielles Fanprojekt, nicht mit COVER Corp. verbunden.',
-    'Inhalte © COVER Corp. / jeweilige Rechteinhaber.',
-    'Wörterbuchdaten: JMdict, JMnedict, KANJIDIC2, KRADFILE © EDRDG (CC BY-SA 4.0).',
-    'Daten: Holodex.',
+    'Unofficial fan project, not affiliated with COVER Corp.',
+    'Content © COVER Corp. / respective rights holders.',
+    'Dictionary data: JMdict, JMnedict, KANJIDIC2, KRADFILE © EDRDG (CC BY-SA 4.0).',
+    'Data: Holodex.',
 ].join(' ');
 
 export function AppFooter() {
@@ -18,7 +18,7 @@ export function AppFooter() {
                     href={privacy()}
                     className="underline underline-offset-4 hover:text-foreground"
                 >
-                    Datenschutz
+                    Privacy
                 </Link>
                 <a
                     href="https://github.com/Bestora/holo-learn"

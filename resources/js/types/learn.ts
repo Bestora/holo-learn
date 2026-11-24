@@ -105,7 +105,7 @@ export type AnswerResult = {
 export const KIND_LABEL: Record<ItemKind, string> = {
     hiragana: 'Hiragana',
     katakana: 'Katakana',
-    radical: 'Radikal',
+    radical: 'Radical',
     kanji: 'Kanji',
-    vocab: 'Vokabel',
+    vocab: 'Vocabulary',
 };

@@ -14,14 +14,14 @@ import PasskeyVerify from '@/components/passkey-verify';
 export default function ConfirmPassword() {
     return (
         <>
-            <Head title="Passwort bestätigen" />
+            <Head title="Confirm password" />
 
             <PasskeyVerify
                 routes={{
                     options: confirmOptions(),
                     submit: confirmStore(),
                 }}
-                label="Mit Passkey bestätigen"
+                label="Confirm with passkey"
                 loadingLabel="Confirming..."
                 separator="Or confirm with password"
             />
@@ -30,11 +30,11 @@ export default function ConfirmPassword() {
                 {({ processing, errors }) => (
                     <div className="space-y-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Passwort</Label>
+                            <Label htmlFor="password">Password</Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
-                                placeholder="Passwort"
+                                placeholder="Password"
                                 autoComplete="current-password"
                                 autoFocus
                             />
@@ -49,7 +49,7 @@ export default function ConfirmPassword() {
                                 data-test="confirm-password-button"
                             >
                                 {processing && <Spinner />}
-                                Passwort bestätigen
+                                Confirm password
                             </Button>
                         </div>
                     </div>
@@ -60,7 +60,7 @@ export default function ConfirmPassword() {
 }
 
 ConfirmPassword.layout = {
-    title: 'Passwort bestätigen',
+    title: 'Confirm password',
     description:
-        'Geschützter Bereich. Bitte bestätige dein Passwort, um fortzufahren.',
+        'This is a secure area of the application. Please confirm your password before continuing.',
 };

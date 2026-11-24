@@ -7,9 +7,9 @@ import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import { edit } from '@/routes/profile';
 import { update as updateSpecials } from '@/routes/specials';
-import { cn } from '@/lib/utils';
 import type { Auth } from '@/types';
 import { send } from '@/routes/verification';
 
@@ -28,15 +28,15 @@ export default function Profile({
 
     return (
         <>
-            <Head title="Profil" />
+            <Head title="Profile settings" />
 
-            <h1 className="sr-only">Profil</h1>
+            <h1 className="sr-only">Profile settings</h1>
 
             <div className="space-y-6">
                 <Heading
                     variant="small"
-                    title="Profil"
-                    description="Name und E-Mail-Adresse ändern"
+                    title="Profile"
+                    description="Update your name and email address"
                 />
 
                 <Form
@@ -58,7 +58,7 @@ export default function Profile({
                                     name="name"
                                     required
                                     autoComplete="name"
-                                    placeholder="Dein Name"
+                                    placeholder="Full name"
                                 />
 
                                 <InputError
@@ -68,7 +68,7 @@ export default function Profile({
                             </div>
 
                             <div className="grid gap-2">
-                                <Label htmlFor="email">E-Mail-Adresse</Label>
+                                <Label htmlFor="email">Email address</Label>
 
                                 <Input
                                     id="email"
@@ -78,7 +78,7 @@ export default function Profile({
                                     name="email"
                                     required
                                     autoComplete="username"
-                                    placeholder="E-Mail-Adresse"
+                                    placeholder="Email address"
                                 />
 
                                 <InputError
@@ -91,23 +91,22 @@ export default function Profile({
                                 auth.user.email_verified_at === null && (
                                     <div>
                                         <p className="-mt-4 text-sm text-muted-foreground">
-                                            Deine E-Mail-Adresse ist noch nicht
-                                            bestätigt.{' '}
+                                            Your email address is unverified.{' '}
                                             <Link
                                                 href={send()}
                                                 as="button"
                                                 className="text-foreground underline decoration-neutral-300 underline-offset-4 transition-colors duration-300 ease-out hover:decoration-current! dark:decoration-neutral-500"
                                             >
-                                                Bestätigungs-E-Mail erneut
-                                                senden.
+                                                Click here to re-send the
+                                                verification email.
                                             </Link>
                                         </p>
 
                                         {status ===
                                             'verification-link-sent' && (
                                             <div className="mt-2 text-sm font-medium text-green-600">
-                                                Ein neuer Bestätigungslink ist
-                                                unterwegs.
+                                                A new verification link has been
+                                                sent to your email address.
                                             </div>
                                         )}
                                     </div>
@@ -118,7 +117,7 @@ export default function Profile({
                                     disabled={processing}
                                     data-test="update-profile-button"
                                 >
-                                    Speichern
+                                    Save
                                 </Button>
                             </div>
                         </>
@@ -146,20 +145,20 @@ function SpecialsSetting({ enabled }: { enabled: boolean }) {
         <div className="space-y-4">
             <Heading
                 variant="small"
-                title="Lernen"
-                description="Was in deinen Lektionen vorkommt"
+                title="Learning"
+                description="What shows up in your lessons"
             />
             <div className="flex items-start justify-between gap-4 rounded-2xl border border-border bg-card p-4">
                 <div>
                     <p id="specials-label" className="font-semibold">
-                        Spezial-Inhalte
+                        Special items
                     </p>
                     <p
                         id="specials-description"
                         className="text-sm text-muted-foreground"
                     >
-                        Zusätzliche Elemente abseits des Grundwortschatzes, in
-                        der Lektion mit „Spezial“ markiert.
+                        Extra characters and words beyond the basics, marked
+                        “Special” in lessons.
                     </p>
                 </div>
                 <button
@@ -189,7 +188,7 @@ function SpecialsSetting({ enabled }: { enabled: boolean }) {
 Profile.layout = {
     breadcrumbs: [
         {
-            title: 'Profil',
+            title: 'Profile settings',
             href: edit(),
         },
     ],

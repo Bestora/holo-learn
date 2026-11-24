@@ -26,15 +26,14 @@ export default function Rejected({
 }) {
     return (
         <>
-            <Head title="Abgelehnte Annotationen" />
+            <Head title="Rejected annotations" />
             <div className="flex w-full flex-col gap-4 px-4 py-6">
                 <header>
                     <h1 className="text-2xl font-extrabold">
-                        Abgelehnte Annotationen
+                        Rejected annotations
                     </h1>
                     <p className="text-muted-foreground">
-                        {annotations.total} Referenzen, die die Prüfung nicht
-                        bestanden haben.
+                        {annotations.total} references that failed the check.
                     </p>
                 </header>
 
@@ -46,8 +45,8 @@ export default function Rejected({
                                 <th className="p-3 font-semibold">
                                     Alt (Holodex)
                                 </th>
-                                <th className="p-3 font-semibold">Wörter</th>
-                                <th className="p-3 font-semibold">Fehler</th>
+                                <th className="p-3 font-semibold">Words</th>
+                                <th className="p-3 font-semibold">Errors</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -115,7 +114,7 @@ export default function Rejected({
                 </div>
 
                 {annotations.links.length > 3 && (
-                    <nav className="flex flex-wrap gap-1" aria-label="Seiten">
+                    <nav className="flex flex-wrap gap-1" aria-label="Pages">
                         {annotations.links.map((link, i) =>
                             link.url ? (
                                 <Link
@@ -150,15 +149,15 @@ export default function Rejected({
 // the paginator sends "&laquo; Previous" / "Next &raquo;" labels
 function pageLabel(label: string): string {
     if (label.includes('Previous') || label.includes('laquo')) {
-        return 'Zurück';
+        return 'Previous';
     }
     if (label.includes('Next') || label.includes('raquo')) {
-        return 'Weiter';
+        return 'Next';
     }
 
     return label;
 }
 
 Rejected.layout = {
-    breadcrumbs: [{ title: 'Abgelehnt', href: rejected() }],
+    breadcrumbs: [{ title: 'Rejected', href: rejected() }],
 };

@@ -5,7 +5,7 @@ import { home } from '@/routes';
 export default function Privacy() {
     return (
         <>
-            <Head title="Datenschutz" />
+            <Head title="Privacy" />
             <div className="flex min-h-svh flex-col bg-background">
                 <header className="mx-auto w-full max-w-2xl px-4 pt-6">
                     <Link href={home()} className="text-lg font-extrabold">
@@ -13,84 +13,80 @@ export default function Privacy() {
                     </Link>
                 </header>
                 <main className="mx-auto w-full max-w-2xl px-4 py-8 [&_h2]:mt-8 [&_h2]:mb-2 [&_h2]:text-xl [&_h2]:font-bold [&_li]:mt-1 [&_p]:mt-2 [&_ul]:list-disc [&_ul]:pl-5">
-                    <h1 className="text-3xl font-extrabold">Datenschutz</h1>
+                    <h1 className="text-3xl font-extrabold">Privacy</h1>
                     <p>
-                        holo-learn ist ein privates, nicht kommerzielles
-                        Fanprojekt für ein paar Leute. Hier steht, welche Daten
-                        anfallen und wohin sie gehen.
+                        holo-learn is a private, non-commercial fan project for
+                        a few people. This page lists what data comes up and
+                        where it goes.
                     </p>
 
-                    <h2>Was gespeichert wird</h2>
+                    <h2>What is stored</h2>
                     <ul>
                         <li>
-                            Konto: Name, E-Mail-Adresse, Passwort (nur als
-                            Hash), auf Wunsch Passkeys und Zwei-Faktor-Daten.
+                            Account: name, email address, password (as a hash
+                            only), and passkeys or two-factor data if you set
+                            them up.
                         </li>
                         <li>
-                            Lernstand: welche Zeichen und Wörter du gelernt
-                            hast, deine Antworten der laufenden Lektion,
-                            Wiederholungstermine, Tage in Folge, Favoriten und
-                            Einstellungen.
+                            Learning progress: which characters and words you
+                            have learned, your answers in the current lesson,
+                            review dates, your streak, favorites and settings.
                         </li>
                         <li>
-                            Ein Sitzungs-Cookie, damit du angemeldet bleibst. Es
-                            gibt keine Werbe- oder Analyse-Cookies.
+                            A session cookie that keeps you signed in. There are
+                            no advertising or analytics cookies.
                         </li>
                     </ul>
                     <p>
-                        Die Daten liegen auf dem Server dieses Projekts und
-                        werden nicht weitergegeben. Wenn du dein Konto in den
-                        Einstellungen löschst, wird auch dein Lernstand
-                        gelöscht.
+                        The data stays on this project&apos;s server and is not
+                        passed on. Deleting your account in the settings also
+                        deletes your learning progress.
                     </p>
 
                     <h2>YouTube</h2>
                     <p>
-                        Die Seite zeigt kurze Ausschnitte aus YouTube-Videos:
-                        nach jeder Antwort und auf den Vorstellungskarten neuer
-                        Zeichen. Erst wenn ein Ausschnitt gezeigt wird, lädt
-                        dein Browser das Player-Skript von youtube.com und den
-                        Player selbst von youtube-nocookie.com. Dabei erhält
-                        Google unter anderem deine IP-Adresse. Auf einer
-                        Fragekarte vor der Antwort wird nichts von YouTube
-                        geladen.
+                        The app shows short clips from YouTube videos: after
+                        each answer and on the introduction cards of new
+                        characters. Only when a clip is shown does your browser
+                        load the player script from youtube.com and the player
+                        itself from youtube-nocookie.com. Google receives your
+                        IP address, among other things. Nothing from YouTube is
+                        loaded on a question card before you answer.
                     </p>
                     <p>
-                        Die Fotos der Talente lädt dein Browser direkt von
-                        Googles Bildservern (yt3.ggpht.com), auch schon auf
-                        Fragekarten. Sie werden nicht auf diesem Server
-                        gespeichert.
+                        Your browser loads talent photos directly from
+                        Google&apos;s image servers (yt3.ggpht.com), on question
+                        cards too. They are not stored on this server.
                     </p>
                     <p>
-                        Meldet der Player, dass ein Video fehlt, fragt der
-                        Server bei YouTube nach, ob es das Video noch gibt.
-                        Dabei werden keine Daten über dich übertragen.
+                        If the player reports a missing video, the server asks
+                        YouTube whether the video still exists. No data about
+                        you is sent.
                     </p>
 
                     <h2>Holodex</h2>
                     <p>
-                        Talente, Songs und Videos stammen aus der öffentlichen
-                        Holodex-API. Der Server fragt sie dort ab; dein Browser
-                        hat dabei keinen Kontakt zu Holodex, und es werden keine
-                        Daten über dich an Holodex geschickt.
+                        Talents, songs and videos come from the public Holodex
+                        API. The server fetches them; your browser never
+                        contacts Holodex, and no data about you is sent there.
                     </p>
 
-                    <h2>Kein Tracking</h2>
+                    <h2>No tracking</h2>
                     <p>
-                        Es gibt keine Analyse-Werkzeuge, keine Werbung und keine
-                        Profilbildung.
+                        There are no analytics tools, no ads and no profiling.
                     </p>
 
-                    <h2>Kontakt</h2>
+                    <h2>Contact</h2>
                     <p>
-                        Fragen und Wünsche zu deinen Daten bitte als Issue im{' '}
+                        For questions or requests about your data, please open
+                        an issue in the{' '}
                         <a
                             href="https://github.com/Bestora/holo-learn"
                             className="text-primary underline underline-offset-4"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
-                            GitHub-Repository
+                            GitHub repository
                         </a>
                         .
                     </p>

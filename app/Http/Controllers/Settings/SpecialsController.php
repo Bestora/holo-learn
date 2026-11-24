@@ -12,8 +12,8 @@ class SpecialsController extends Controller
     public function update(Request $request): RedirectResponse
     {
         $data = $request->validate(['enabled' => ['required', 'boolean']], [
-            'enabled.required' => 'Bitte an oder aus wählen.',
-            'enabled.boolean' => 'Bitte an oder aus wählen.',
+            'enabled.required' => 'Please choose on or off.',
+            'enabled.boolean' => 'Please choose on or off.',
         ]);
 
         $request->user()->forceFill(['specials_enabled' => (bool) $data['enabled']])->save();

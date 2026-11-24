@@ -127,7 +127,7 @@ function FuriganaText({
         return (
             <span
                 key={key}
-                title={word && !word.ok ? 'ungeprüft' : undefined}
+                title={word && !word.ok ? 'unverified' : undefined}
                 className={cn(
                     'inline-flex flex-col items-center',
                     word && !word.ok && 'opacity-55',
@@ -182,7 +182,7 @@ function FuriganaText({
                             {words.map((w, i) => (
                                 <span
                                     key={i}
-                                    title={w.ok ? undefined : 'ungeprüft'}
+                                    title={w.ok ? undefined : 'unverified'}
                                     className={cn(
                                         'inline-flex flex-col items-center',
                                         !w.ok && 'opacity-55',
@@ -208,8 +208,8 @@ function FuriganaText({
             )}
             {unchecked && (
                 <p className="mt-3 text-center text-xs text-muted-foreground">
-                    Blass und kursiv: ungeprüft, die Lesung dieses Worts ist
-                    nicht bestätigt.
+                    Faded and italic: unverified, the reading of this word is
+                    not confirmed.
                 </p>
             )}
         </div>
@@ -277,13 +277,13 @@ export function CardMeta({ card }: { card: Card }) {
         <div className="flex items-center justify-center gap-3 text-sm text-muted-foreground">
             <TalentPhoto talent={card.talent} className="size-10" />
             <span>
-                {ref.kind === 'name' ? 'Name' : 'Songtitel'}
+                {ref.kind === 'name' ? 'Name' : 'Song title'}{' '}
                 {card.remaining_references > 0 && (
                     <>
-                        , noch {card.remaining_references} weitere{' '}
+                        , {card.remaining_references} more{' '}
                         {card.remaining_references === 1
-                            ? 'Referenz'
-                            : 'Referenzen'}
+                            ? 'reference'
+                            : 'references'}
                     </>
                 )}
             </span>
@@ -368,8 +368,8 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                     {reveal.context_reading && card.field === 'reading' && (
                         <p className="text-sm">
                             {card.is_name_reading
-                                ? 'Lesung in diesem Namen'
-                                : 'Lesung hier'}
+                                ? 'Reading in this name'
+                                : 'Reading here'}
                             :{' '}
                             <span lang="ja" className="text-lg font-bold">
                                 {reveal.context_reading}
@@ -383,7 +383,7 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                                     {reveal.meaning}
                                 </dd>
                                 <dt className="text-xs text-muted-foreground">
-                                    automatisch übersetzt
+                                    machine-translated
                                 </dt>
                             </div>
                         )}
@@ -392,8 +392,8 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                                 <dd className="text-base">{reveal.alt_text}</dd>
                                 <dt className="text-xs text-muted-foreground">
                                     {reveal.alt_kind === 'romaji'
-                                        ? 'Schreibweise bei Holodex'
-                                        : 'Titel bei Holodex'}
+                                        ? 'Spelling on Holodex'
+                                        : 'Title on Holodex'}
                                 </dt>
                             </div>
                         )}
@@ -408,7 +408,7 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                     className="mx-auto inline-flex min-h-11 items-center gap-2 rounded-full border border-border bg-card px-5 text-sm font-semibold hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
                 >
                     <Volume2 className="size-4" aria-hidden />
-                    Vorlesen
+                    Read aloud
                 </button>
             )}
 
@@ -441,7 +441,7 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                                     rel="noopener noreferrer"
                                     className="text-sm text-primary underline underline-offset-4"
                                 >
-                                    Auf YouTube öffnen
+                                    Open on YouTube
                                 </a>
                             )}
                         </div>

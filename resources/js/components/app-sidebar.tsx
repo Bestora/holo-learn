@@ -27,13 +27,13 @@ import { index as learn } from '@/routes/learn';
 import type { NavItem } from '@/types';
 
 const mainNavItems: NavItem[] = [
-    { title: 'Start', href: dashboard(), icon: House },
-    { title: 'Lernen', href: learn(), icon: GraduationCap },
-    { title: 'Favoriten', href: favorites(), icon: Heart },
+    { title: 'Home', href: dashboard(), icon: House },
+    { title: 'Learn', href: learn(), icon: GraduationCap },
+    { title: 'Favorites', href: favorites(), icon: Heart },
 ];
 
 const adminNavItems: NavItem[] = [
-    { title: 'Abgelehnt', href: rejected(), icon: ShieldAlert },
+    { title: 'Rejected', href: rejected(), icon: ShieldAlert },
 ];
 
 const footerNavItems: NavItem[] = [

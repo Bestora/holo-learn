@@ -16,11 +16,11 @@ export async function postJson<T>(url: string, data: unknown = {}): Promise<T> {
 /** The first validation message of a failed request, else a generic one. */
 export function errorMessage(error: unknown): string {
     if (error instanceof HttpCancelledError) {
-        return 'Der Server antwortet gerade nicht. Deine Antwort ist noch nicht gezählt.';
+        return 'The server is not responding. Your answer has not been counted yet.';
     }
     if (error instanceof HttpResponseError) {
         if (error.response.status >= 500) {
-            return 'Auf dem Server ist etwas schiefgelaufen. Deine Antwort ist noch nicht gezählt.';
+            return 'Something went wrong on the server. Your answer has not been counted yet.';
         }
         try {
             const body = JSON.parse(error.response.data) as {
@@ -29,16 +29,16 @@ export function errorMessage(error: unknown): string {
             };
             const first = Object.values(body.errors ?? {})[0]?.[0];
 
-            return first ?? body.message ?? 'Das hat nicht geklappt.';
+            return first ?? body.message ?? 'That did not work.';
         } catch {
             // not JSON
         }
     }
 
-    return 'Keine Verbindung zum Server. Deine Antwort ist noch nicht gezählt.';
+    return 'No connection to the server. Your answer has not been counted yet.';
 }
 
-const dateTime = new Intl.DateTimeFormat('de-DE', {
+const dateTime = new Intl.DateTimeFormat('en-GB', {
     weekday: 'short',
     day: 'numeric',
     month: 'short',

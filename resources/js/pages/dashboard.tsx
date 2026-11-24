@@ -24,7 +24,7 @@ const KINDS: [ItemKind, string][] = [
 export default function Dashboard({ stats }: { stats: Stats }) {
     return (
         <>
-            <Head title="Start" />
+            <Head title="Home" />
             <div className="mx-auto flex w-full max-w-3xl flex-col gap-8 px-4 py-6 sm:py-10">
                 <section className="relative overflow-hidden rounded-3xl bg-primary p-6 text-primary-foreground sm:p-10">
                     <span
@@ -45,9 +45,9 @@ export default function Dashboard({ stats }: { stats: Stats }) {
                                     {stats.streak_days}
                                 </span>
                                 <span className="text-lg leading-tight">
-                                    {stats.streak_days === 1 ? 'Tag' : 'Tage'}
+                                    day
                                     <br />
-                                    in Folge
+                                    streak
                                 </span>
                             </p>
                             <p className="text-lg">
@@ -57,11 +57,11 @@ export default function Dashboard({ stats }: { stats: Stats }) {
                                             {stats.due_count}
                                         </strong>{' '}
                                         {stats.due_count === 1
-                                            ? 'Wiederholung wartet'
-                                            : 'Wiederholungen warten'}
+                                            ? 'review waiting'
+                                            : 'reviews waiting'}
                                     </>
                                 ) : (
-                                    'Keine Wiederholung fällig'
+                                    'No reviews due'
                                 )}
                             </p>
                         </div>
@@ -70,7 +70,7 @@ export default function Dashboard({ stats }: { stats: Stats }) {
                             as="button"
                             className="min-h-16 w-full rounded-2xl bg-background text-xl font-extrabold text-foreground shadow-[0_5px_0_color-mix(in_oklab,var(--primary)_55%,black)] transition-transform focus-visible:ring-4 focus-visible:ring-penlight focus-visible:outline-none active:translate-y-1 active:shadow-none sm:w-auto sm:px-12"
                         >
-                            Lektion starten
+                            Start lesson
                         </Link>
                     </div>
                 </section>
@@ -80,7 +80,7 @@ export default function Dashboard({ stats }: { stats: Stats }) {
                     className="flex flex-col gap-3"
                 >
                     <h2 id="progress-heading" className="text-xl font-bold">
-                        Dein Fortschritt
+                        Your progress
                     </h2>
                     <ul className="flex flex-col gap-2">
                         {KINDS.map(([kind, glyph]) => {
@@ -109,13 +109,13 @@ export default function Dashboard({ stats }: { stats: Stats }) {
                                                 {KIND_LABEL[kind]}
                                             </span>
                                             <span className="text-sm text-muted-foreground tabular-nums">
-                                                {learned} von {total} gelernt
+                                                {learned} of {total} learned
                                             </span>
                                         </div>
                                         <div
                                             className="h-2.5 overflow-hidden rounded-full bg-muted"
                                             role="progressbar"
-                                            aria-label={`${KIND_LABEL[kind]}: ${learned} von ${total}`}
+                                            aria-label={`${KIND_LABEL[kind]}: ${learned} of ${total}`}
                                             aria-valuenow={learned}
                                             aria-valuemin={0}
                                             aria-valuemax={total}
@@ -131,7 +131,8 @@ export default function Dashboard({ stats }: { stats: Stats }) {
                         })}
                     </ul>
                     <p className="text-sm text-muted-foreground">
-                        „Von“ zählt alles, wozu es schon genug Referenzen gibt.
+                        “Of” counts everything that already has enough
+                        references.
                     </p>
                 </section>
             </div>
@@ -140,5 +141,5 @@ export default function Dashboard({ stats }: { stats: Stats }) {
 }
 
 Dashboard.layout = {
-    breadcrumbs: [{ title: 'Start', href: dashboard() }],
+    breadcrumbs: [{ title: 'Home', href: dashboard() }],
 };

@@ -16,7 +16,7 @@ type Props = {
 export default function ResetPassword({ token, email, passwordRules }: Props) {
     return (
         <>
-            <Head title="Passwort zurücksetzen" />
+            <Head title="Reset password" />
 
             <Form
                 {...update.form()}
@@ -26,7 +26,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                 {({ processing, errors }) => (
                     <div className="grid gap-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="email">E-Mail</Label>
+                            <Label htmlFor="email">Email</Label>
                             <Input
                                 id="email"
                                 type="email"
@@ -43,14 +43,14 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Passwort</Label>
+                            <Label htmlFor="password">Password</Label>
                             <PasswordInput
                                 id="password"
                                 name="password"
                                 autoComplete="new-password"
                                 className="mt-1 block w-full"
                                 autoFocus
-                                placeholder="Passwort"
+                                placeholder="Password"
                                 passwordrules={passwordRules}
                             />
                             <InputError message={errors.password} />
@@ -58,14 +58,14 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 
                         <div className="grid gap-2">
                             <Label htmlFor="password_confirmation">
-                                Passwort bestätigen
+                                Confirm password
                             </Label>
                             <PasswordInput
                                 id="password_confirmation"
                                 name="password_confirmation"
                                 autoComplete="new-password"
                                 className="mt-1 block w-full"
-                                placeholder="Passwort bestätigen"
+                                placeholder="Confirm password"
                                 passwordrules={passwordRules}
                             />
                             <InputError
@@ -81,7 +81,7 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
                             data-test="reset-password-button"
                         >
                             {processing && <Spinner />}
-                            Passwort zurücksetzen
+                            Reset password
                         </Button>
                     </div>
                 )}
@@ -91,6 +91,6 @@ export default function ResetPassword({ token, email, passwordRules }: Props) {
 }
 
 ResetPassword.layout = {
-    title: 'Passwort zurücksetzen',
-    description: 'Gib dein neues Passwort ein.',
+    title: 'Reset password',
+    description: 'Please enter your new password below',
 };

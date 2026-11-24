@@ -31,7 +31,7 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
         const restore = () => {
             queued.current = null;
             setSelected(serverSelection(talents));
-            toast.error('Favoriten konnten nicht gespeichert werden.');
+            toast.error('Could not save your favorites.');
         };
         router.put(
             update.url(),
@@ -88,25 +88,25 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
     // groups in the order of their first talent (the list comes sorted by priority)
     const groups = new Map<string, FavoriteTalent[]>();
     for (const t of shown) {
-        const key = t.group_name ?? 'Weitere';
+        const key = t.group_name ?? 'Other';
         groups.set(key, [...(groups.get(key) ?? []), t]);
     }
 
     return (
         <>
-            <Head title="Favoriten" />
+            <Head title="Favorites" />
             <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:py-10">
                 <header className="flex flex-col gap-2">
-                    <h1 className="text-3xl font-extrabold">Deine Favoriten</h1>
+                    <h1 className="text-3xl font-extrabold">Your favorites</h1>
                     <p className="max-w-prose text-muted-foreground">
-                        Referenzen deiner Favoriten kommen in Lektionen öfter
-                        dran. Gespeichert wird sofort beim Antippen.
+                        References of your favorites show up more often in
+                        lessons. Every tap saves right away.
                     </p>
                 </header>
 
                 <div className="sticky top-0 z-10 -mx-4 bg-background/90 px-4 py-2 backdrop-blur">
                     <label className="relative block">
-                        <span className="sr-only">Talent suchen</span>
+                        <span className="sr-only">Search talents</span>
                         <Search
                             className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
                             aria-hidden
@@ -115,7 +115,7 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
                             type="search"
                             value={query}
                             onChange={(e) => setQuery(e.target.value)}
-                            placeholder="Name oder Gruppe suchen"
+                            placeholder="Search by name or group"
                             className="min-h-12 w-full rounded-2xl border-2 border-input bg-card pr-4 pl-12 text-base focus:border-primary focus:ring-4 focus:ring-ring/30 focus:outline-none"
                         />
                     </label>
@@ -124,8 +124,8 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
                         aria-live="polite"
                     >
                         {selected.size === 0
-                            ? 'Noch keine Favoriten.'
-                            : `${selected.size} ${selected.size === 1 ? 'Favorit' : 'Favoriten'} ausgewählt.`}
+                            ? 'No favorites yet.'
+                            : `${selected.size} ${selected.size === 1 ? 'favorite' : 'favorites'} selected.`}
                     </p>
                 </div>
 
@@ -190,7 +190,7 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
                 ))}
                 {shown.length === 0 && (
                     <p className="text-muted-foreground">
-                        Kein Talent passt zu „{query}“.
+                        No talent matches “{query}”.
                     </p>
                 )}
             </div>
@@ -199,5 +199,5 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
 }
 
 Favorites.layout = {
-    breadcrumbs: [{ title: 'Favoriten', href: index() }],
+    breadcrumbs: [{ title: 'Favorites', href: index() }],
 };

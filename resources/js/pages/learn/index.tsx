@@ -32,7 +32,7 @@ export default function Learn({
 }: LearnProps) {
     return (
         <>
-            <Head title="Lernen" />
+            <Head title="Learn" />
             <div className="mx-auto flex w-full max-w-2xl flex-1 flex-col px-4 pt-4 pb-6 sm:pt-8">
                 {summary ? (
                     <SummaryView summary={summary} />
@@ -53,7 +53,7 @@ export default function Learn({
 }
 
 Learn.layout = {
-    breadcrumbs: [{ title: 'Lernen', href: index() }],
+    breadcrumbs: [{ title: 'Learn', href: index() }],
 };
 
 /** A vocabulary item is the whole word: light all of it, not only its first character. */
@@ -66,14 +66,14 @@ function litWord(card: Card): Card {
         : card;
 }
 
-/** "n von 10" as a row of penlights: done ones lit, the current one blinking softly. */
+/** "n of 10" as a row of penlights: done ones lit, the current one blinking softly. */
 function Progress({ lesson }: { lesson: Lesson }) {
     const current = Math.min(lesson.position + 1, lesson.size);
 
     return (
         <div
             className="mb-6 flex items-center gap-3"
-            aria-label={`Karte ${current} von ${lesson.size}`}
+            aria-label={`Card ${current} of ${lesson.size}`}
         >
             <div className="flex flex-1 gap-1.5" aria-hidden>
                 {Array.from({ length: lesson.size }, (_, i) => (
@@ -91,7 +91,7 @@ function Progress({ lesson }: { lesson: Lesson }) {
                 ))}
             </div>
             <span className="text-sm font-semibold whitespace-nowrap tabular-nums">
-                {current} von {lesson.size}
+                {current} of {lesson.size}
             </span>
         </div>
     );
@@ -101,24 +101,24 @@ function prompt(card: Card): string {
     const { kind } = card.item;
     if (card.field === 'meaning') {
         return kind === 'radical'
-            ? 'Was bedeutet dieses Radikal?'
+            ? 'What does this radical mean?'
             : kind === 'vocab'
-              ? 'Was bedeutet das Wort?'
-              : 'Was bedeutet das leuchtende Zeichen?';
+              ? 'What does this word mean?'
+              : 'What does the glowing character mean?';
     }
     if (kind === 'hiragana' || kind === 'katakana') {
-        return 'Wie liest man das leuchtende Zeichen?';
+        return 'How do you read the glowing character?';
     }
 
     const ref = card.reference;
     const underlined = ref?.word.some((p) => !ref.highlight.includes(p));
     const what = underlined
-        ? 'das unterstrichene Wort'
+        ? 'the underlined word'
         : kind === 'vocab'
-          ? 'das leuchtende Wort'
-          : 'das leuchtende Zeichen';
+          ? 'the glowing word'
+          : 'the glowing character';
 
-    return `Wie liest man ${what}${card.is_name_reading ? ' in diesem Namen' : ''}?`;
+    return `How do you read ${what}${card.is_name_reading ? ' in this name' : ''}?`;
 }
 
 function CardView({ card }: { card: Card }) {
@@ -207,12 +207,12 @@ function CardView({ card }: { card: Card }) {
     return (
         <div className="flex flex-1 flex-col gap-6">
             <div className="flex flex-wrap items-center justify-center gap-2">
-                {isIntro && <Badge className="bg-primary">Neu</Badge>}
+                {isIntro && <Badge className="bg-primary">New</Badge>}
                 <Badge variant="secondary">{KIND_LABEL[card.item.kind]}</Badge>
                 {card.item.is_special && (
                     <Badge className="gap-1 bg-penlight text-white">
                         <Sparkles className="size-3" aria-hidden />
-                        Spezial
+                        Special
                     </Badge>
                 )}
             </div>
@@ -233,7 +233,7 @@ function CardView({ card }: { card: Card }) {
                                 {card.item.characters}
                             </p>
                             <p className="text-sm text-muted-foreground">
-                                steckt in
+                                is part of
                             </p>
                             <ReferenceText reference={card.reference} />
                         </>
@@ -277,14 +277,14 @@ function CardView({ card }: { card: Card }) {
                             disabled={busy}
                             className="min-h-11 rounded-xl bg-primary px-5 font-semibold text-primary-foreground disabled:opacity-60"
                         >
-                            Nochmal versuchen
+                            Try again
                         </button>
                         <button
                             type="button"
                             onClick={() => router.reload()}
                             className="min-h-11 rounded-xl px-5 font-semibold text-primary"
                         >
-                            Seite neu laden
+                            Reload page
                         </button>
                     </div>
                 </div>
@@ -325,7 +325,7 @@ function CardView({ card }: { card: Card }) {
                                 disabled={busy}
                                 className="min-h-11 rounded-xl text-sm font-semibold text-primary underline-offset-4 hover:underline disabled:opacity-50"
                             >
-                                Ich lag richtig
+                                I was right
                             </button>
                         )}
                     <button
@@ -335,7 +335,7 @@ function CardView({ card }: { card: Card }) {
                         disabled={busy}
                         className="min-h-14 rounded-2xl bg-primary text-lg font-bold text-primary-foreground shadow-[0_4px_0_color-mix(in_oklab,var(--primary)_60%,black)] transition-transform focus-visible:ring-4 focus-visible:ring-ring/40 focus-visible:outline-none active:translate-y-0.5 active:shadow-none disabled:opacity-60"
                     >
-                        Weiter
+                        Continue
                     </button>
                 </div>
             )}
@@ -377,14 +377,14 @@ function ResultBanner({
             <div className="min-w-0">
                 <p className="text-lg font-bold">
                     {overridden
-                        ? 'Als richtig gezählt'
+                        ? 'Counted as correct'
                         : correct
-                          ? 'Richtig!'
-                          : 'Nicht ganz'}
+                          ? 'Correct!'
+                          : 'Not quite'}
                 </p>
                 {!correct && expected.length > 0 && (
                     <p className="text-foreground">
-                        Richtig wäre:{' '}
+                        Correct answer:{' '}
                         <span lang="ja" className="font-bold">
                             {expected.slice(0, 3).join(' / ')}
                         </span>
@@ -497,7 +497,7 @@ function TypedAnswer({
     return (
         <form onSubmit={send} className="flex flex-col gap-3">
             <label htmlFor="answer" className="sr-only">
-                Antwort
+                Answer
             </label>
             <input
                 id="answer"
@@ -515,10 +515,10 @@ function TypedAnswer({
                 }
                 placeholder={
                     asKana
-                        ? 'Lesung tippen, z. B. hana → はな'
+                        ? 'Type the reading, e.g. hana → はな'
                         : card.field === 'reading'
-                          ? 'Lesung in Romaji, z. B. ne'
-                          : 'Bedeutung auf Englisch'
+                          ? 'Reading in romaji, e.g. ne'
+                          : 'Meaning in English'
                 }
                 className="min-h-16 w-full rounded-2xl border-2 border-input bg-card px-5 text-center text-2xl font-bold placeholder:text-base placeholder:font-normal placeholder:text-muted-foreground focus:border-primary focus:ring-4 focus:ring-ring/30 focus:outline-none"
             />
@@ -527,7 +527,7 @@ function TypedAnswer({
                 disabled={busy || value.trim() === ''}
                 className="min-h-14 rounded-2xl bg-primary text-lg font-bold text-primary-foreground disabled:opacity-40"
             >
-                Prüfen
+                Check
             </button>
         </form>
     );
@@ -539,25 +539,28 @@ function SummaryView({ summary }: { summary: Summary }) {
     return (
         <section className="flex flex-1 animate-rise flex-col items-center gap-8 text-center">
             <div>
-                <p lang="ja" className="penlight text-7xl font-bold">
+                <p
+                    lang="ja"
+                    className="penlight text-6xl font-bold whitespace-nowrap sm:text-7xl"
+                >
                     おつかれ！
                 </p>
-                <h1 className="mt-3 text-2xl font-bold">Lektion geschafft</h1>
+                <h1 className="mt-3 text-2xl font-bold">Lesson complete</h1>
             </div>
 
             <dl className="grid w-full grid-cols-3 gap-3">
                 <Stat
-                    label="richtig"
+                    label="correct"
                     value={summary.correct}
                     className="text-correct"
                 />
                 <Stat
-                    label="falsch"
+                    label="wrong"
                     value={summary.wrong}
                     className="text-wrong"
                 />
                 <Stat
-                    label="neu gelernt"
+                    label="new"
                     value={summary.new_items}
                     className="text-primary"
                 />
@@ -566,14 +569,13 @@ function SummaryView({ summary }: { summary: Summary }) {
             <p className="flex items-center gap-2 text-lg">
                 <Flame className="size-6 text-penlight" aria-hidden />
                 <span>
-                    <strong>{summary.streak_days}</strong>{' '}
-                    {summary.streak_days === 1 ? 'Tag' : 'Tage'} in Folge
+                    <strong>{summary.streak_days}</strong> day streak
                 </span>
             </p>
             {total > 0 && (
                 <p className="text-muted-foreground">
-                    {Math.round((summary.correct / total) * 100)} % der
-                    Antworten waren richtig.
+                    {Math.round((summary.correct / total) * 100)}% of your
+                    answers were correct.
                 </p>
             )}
 
@@ -583,13 +585,13 @@ function SummaryView({ summary }: { summary: Summary }) {
                     as="button"
                     className="min-h-14 rounded-2xl bg-primary text-lg font-bold text-primary-foreground"
                 >
-                    Nächste Lektion
+                    Next lesson
                 </Link>
                 <Link
                     href={dashboard()}
                     className="flex min-h-11 items-center justify-center rounded-xl font-semibold text-primary"
                 >
-                    Zur Startseite
+                    Back home
                 </Link>
             </div>
         </section>
@@ -626,13 +628,11 @@ function NothingDueView({ due }: { due: NothingDue | null }) {
             <p lang="ja" className="text-6xl font-bold text-primary">
                 またね
             </p>
-            <h1 className="text-2xl font-bold">
-                Gerade gibt es nichts zu lernen
-            </h1>
+            <h1 className="text-2xl font-bold">Nothing to learn right now</h1>
             <div className="space-y-1 text-muted-foreground">
                 {due?.next_due_at && (
                     <p>
-                        Nächste Wiederholung:{' '}
+                        Next review:{' '}
                         <strong className="text-foreground">
                             {formatDateTime(due.next_due_at)}
                         </strong>
@@ -640,21 +640,21 @@ function NothingDueView({ due }: { due: NothingDue | null }) {
                 )}
                 {due?.new_items_at && (
                     <p>
-                        Neue Zeichen ab:{' '}
+                        New characters from:{' '}
                         <strong className="text-foreground">
                             {formatDateTime(due.new_items_at)}
                         </strong>
                     </p>
                 )}
                 {!due?.next_due_at && !due?.new_items_at && (
-                    <p>Schau später wieder vorbei.</p>
+                    <p>Come back later.</p>
                 )}
             </div>
             <Link
                 href={dashboard()}
                 className="flex min-h-12 items-center rounded-2xl bg-primary px-6 font-bold text-primary-foreground"
             >
-                Zur Startseite
+                Back home
             </Link>
         </section>
     );

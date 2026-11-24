@@ -152,7 +152,7 @@ class LessonFlow
             $lesson = $user->lessons()->latest('id')->lockForUpdate()->first();
             $last = $lesson?->state['last_answer'] ?? null;
             if ($lesson === null || $last === null || ! $last['overridable']) {
-                throw ValidationException::withMessages(['answer' => 'Diese Antwort kann nicht mehr als richtig gewertet werden.']);
+                throw ValidationException::withMessages(['answer' => 'This answer can no longer be counted as correct.']);
             }
             $review = Review::query()->whereKey($last['review_id'])->lockForUpdate()->first() ?? throw $this->stale();
 
@@ -222,7 +222,7 @@ class LessonFlow
 
     private function stale(): ValidationException
     {
-        return ValidationException::withMessages(['item_id' => 'Diese Karte ist nicht mehr aktuell.']);
+        return ValidationException::withMessages(['item_id' => 'This card is out of date. Reload to get the current one.']);
     }
 
     private function lockUser(User $user): User
