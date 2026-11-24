@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <meta name="theme-color" content="#f4f5ff" />
+        <title>Offline - holo-learn</title>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <style>
+            :root {
+                color-scheme: light dark;
+                --bg: #f4f5ff;
+                --fg: #1e1b4b;
+                --muted: #5f5c8a;
+                --primary: #4434e0;
+            }
+            @media (prefers-color-scheme: dark) {
+                :root {
+                    --bg: #13112f;
+                    --fg: #eef0ff;
+                    --muted: #a9a6d6;
+                    --primary: #8f86ff;
+                }
+            }
+            html,
+            body {
+                margin: 0;
+                min-height: 100%;
+                background: var(--bg);
+                color: var(--fg);
+            }
+            body {
+                min-height: 100svh;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                gap: 1rem;
+                padding: 0 16px;
+                text-align: center;
+                font-family: ui-sans-serif, system-ui, sans-serif;
+            }
+            img {
+                width: 96px;
+                height: 96px;
+                border-radius: 22px;
+            }
+            h1 {
+                margin: 0;
+                font-size: 1.5rem;
+            }
+            p {
+                margin: 0;
+                color: var(--muted);
+                max-width: 32ch;
+            }
+            button {
+                min-height: 48px;
+                padding: 0 24px;
+                border: 0;
+                border-radius: 16px;
+                background: var(--primary);
+                color: var(--bg);
+                font: 700 1rem/1 inherit;
+                cursor: pointer;
+            }
+        </style>
+    </head>
+    <body>
+        <img src="/icons/icon-192.png" alt="" />
+        <h1>You're offline</h1>
+        <p>holo-learn needs a connection.</p>
+        <button type="button" onclick="location.reload()">Try again</button>
+    </body>
+</html>
