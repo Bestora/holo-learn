@@ -1,12 +1,13 @@
-import { http, HttpResponseError } from '@inertiajs/core';
+import { http, HttpCancelledError, HttpResponseError } from '@inertiajs/core';
 
-/** JSON POST through Inertia's HTTP client (sends the XSRF token). Throws on 4xx/5xx. */
+/** JSON POST through Inertia's HTTP client (sends the XSRF token). Throws on 4xx/5xx and after 15 s. */
 export async function postJson<T>(url: string, data: unknown = {}): Promise<T> {
     const response = await http.getClient().request({
         method: 'post',
         url,
         data,
         headers: { Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000),
     });
 
     return (response.data ? JSON.parse(response.data) : null) as T;
@@ -14,7 +15,13 @@ export async function postJson<T>(url: string, data: unknown = {}): Promise<T> {
 
 /** The first validation message of a failed request, else a generic one. */
 export function errorMessage(error: unknown): string {
+    if (error instanceof HttpCancelledError) {
+        return 'Der Server antwortet gerade nicht. Deine Antwort ist noch nicht gezählt.';
+    }
     if (error instanceof HttpResponseError) {
+        if (error.response.status >= 500) {
+            return 'Auf dem Server ist etwas schiefgelaufen. Deine Antwort ist noch nicht gezählt.';
+        }
         try {
             const body = JSON.parse(error.response.data) as {
                 message?: string;
@@ -28,7 +35,7 @@ export function errorMessage(error: unknown): string {
         }
     }
 
-    return 'Keine Verbindung zum Server. Bitte nochmal versuchen.';
+    return 'Keine Verbindung zum Server. Deine Antwort ist noch nicht gezählt.';
 }
 
 const dateTime = new Intl.DateTimeFormat('de-DE', {

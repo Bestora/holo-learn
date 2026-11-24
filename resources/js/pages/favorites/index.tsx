@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { Heart, Search } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { index, update } from '@/routes/favorites';
 
@@ -13,11 +14,53 @@ type FavoriteTalent = {
     is_favorite: boolean;
 };
 
+function serverSelection(talents: FavoriteTalent[]): Set<number> {
+    return new Set(talents.filter((t) => t.is_favorite).map((t) => t.id));
+}
+
 export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
     const [query, setQuery] = useState('');
-    const [selected, setSelected] = useState(
-        () => new Set(talents.filter((t) => t.is_favorite).map((t) => t.id)),
-    );
+    const [selected, setSelected] = useState(() => serverSelection(talents));
+
+    // one PUT at a time; taps during a save queue the latest selection
+    const saving = useRef(false);
+    const queued = useRef<Set<number> | null>(null);
+
+    const save = (ids: Set<number>) => {
+        saving.current = true;
+        const restore = () => {
+            queued.current = null;
+            setSelected(serverSelection(talents));
+            toast.error('Favoriten konnten nicht gespeichert werden.');
+        };
+        router.put(
+            update.url(),
+            { talent_ids: [...ids] },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onError: restore,
+                onHttpException: () => {
+                    restore();
+
+                    return false;
+                },
+                onNetworkError: () => {
+                    restore();
+
+                    return false;
+                },
+                onFinish: () => {
+                    saving.current = false;
+                    const next = queued.current;
+                    queued.current = null;
+                    if (next) {
+                        save(next);
+                    }
+                },
+            },
+        );
+    };
 
     const toggle = (id: number) => {
         const next = new Set(selected);
@@ -27,11 +70,11 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
             next.add(id);
         }
         setSelected(next);
-        router.put(
-            update.url(),
-            { talent_ids: [...next] },
-            { preserveScroll: true, preserveState: true },
-        );
+        if (saving.current) {
+            queued.current = next;
+        } else {
+            save(next);
+        }
     };
 
     const q = query.trim().toLowerCase();

@@ -296,7 +296,7 @@ export { TalentPhoto };
 /** Everything shown after the answer (and on intro cards). */
 export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
     const voice = useJapaneseVoice();
-    const [dead_, setDead] = useState(false);
+    const [noClip, setNoClip] = useState(false);
     const ref = card.reference;
     const occurrence = reveal.occurrence;
     const talent =
@@ -315,9 +315,9 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
         speechSynthesis.speak(utterance);
     };
 
-    const markDead = () => {
-        setDead(true);
-        if (occurrence) {
+    const clipFailed = (reason: 'dead' | 'timeout') => {
+        setNoClip(true);
+        if (reason === 'dead' && occurrence) {
             postJson(dead.url(occurrence.id)).catch(() => {});
         }
     };
@@ -412,13 +412,13 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                 </button>
             )}
 
-            {occurrence?.video_id && !dead_ ? (
+            {occurrence?.video_id && !noClip ? (
                 <YoutubeClip
                     videoId={occurrence.video_id}
                     start={occurrence.start_s}
                     end={occurrence.end_s}
                     title={title}
-                    onDead={markDead}
+                    onFail={clipFailed}
                 />
             ) : (
                 talent && (
@@ -436,7 +436,7 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                             )}
                             {occurrence?.video_id && (
                                 <a
-                                    href={`https://www.youtube.com/watch?v=${occurrence.video_id}${occurrence.start_s ? `&t=${occurrence.start_s}` : ''}`}
+                                    href={`https://www.youtube.com/watch?v=${encodeURIComponent(occurrence.video_id)}${occurrence.start_s ? `&t=${occurrence.start_s}` : ''}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-sm text-primary underline underline-offset-4"
@@ -448,7 +448,7 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                     </div>
                 )
             )}
-            {occurrence?.video_id && !dead_ && talentName && (
+            {occurrence?.video_id && !noClip && talentName && (
                 <p className="-mt-4 text-center text-sm text-muted-foreground">
                     {talentName}
                 </p>

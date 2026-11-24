@@ -49,32 +49,40 @@ const DEAD_CODES = [100, 101, 150];
 
 /**
  * Plays `videoId` from `start` to `end` seconds. Mount it only after the answer: the sound would
- * give the answer away. Calls `onDead` when YouTube reports the video gone or not embeddable.
+ * give the answer away. Calls `onFail('dead')` when the player reports the video gone or not
+ * embeddable (the server double-checks), `onFail('timeout')` when the API does not load in 8 s.
  */
 export default function YoutubeClip({
     videoId,
     start,
     end,
     title,
-    onDead,
+    onFail,
 }: {
     videoId: string;
     start: number | null;
     end: number | null;
     title: string;
-    onDead: () => void;
+    onFail: (reason: 'dead' | 'timeout') => void;
 }) {
     const target = useRef<HTMLDivElement>(null);
-    const deadRef = useRef(onDead);
+    const failRef = useRef(onFail);
 
     useEffect(() => {
-        deadRef.current = onDead;
+        failRef.current = onFail;
     });
 
     useEffect(() => {
         const host = target.current;
         let player: YTPlayer | null = null;
         let cancelled = false;
+        // ponytail: blocked or slow youtube.com → plain fallback after 8 s, never marked dead
+        const timeout = window.setTimeout(() => {
+            if (!player) {
+                cancelled = true;
+                failRef.current('timeout');
+            }
+        }, 8000);
 
         void loadApi().then((YT) => {
             if (cancelled || !host) {
@@ -103,7 +111,7 @@ export default function YoutubeClip({
                 events: {
                     onError: (event) => {
                         if (DEAD_CODES.includes(event.data)) {
-                            deadRef.current();
+                            failRef.current('dead');
                         }
                     },
                 },
@@ -112,6 +120,7 @@ export default function YoutubeClip({
 
         return () => {
             cancelled = true;
+            window.clearTimeout(timeout);
             player?.destroy();
             host?.replaceChildren();
         };

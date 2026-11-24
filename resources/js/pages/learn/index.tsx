@@ -126,6 +126,10 @@ function CardView({ card }: { card: Card }) {
     const [chosen, setChosen] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [overridden, setOverridden] = useState(false);
+    const [failed, setFailed] = useState<{
+        message: string;
+        value: string;
+    } | null>(null);
     const nextButton = useRef<HTMLButtonElement>(null);
     const isIntro = card.type === 'intro';
     const done = isIntro || result !== null;
@@ -137,12 +141,26 @@ function CardView({ card }: { card: Card }) {
         }
     }, [done]);
 
+    // a held key must not answer and then skip the reveal: drop auto-repeated Enter and 1–4
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (event.repeat && /^(Enter|[1-4])$/.test(event.key)) {
+                event.preventDefault();
+                event.stopPropagation();
+            }
+        };
+        window.addEventListener('keydown', onKey, true);
+
+        return () => window.removeEventListener('keydown', onKey, true);
+    }, []);
+
     const submit = async (value: string) => {
         if (busy || result) {
             return;
         }
         setBusy(true);
         setChosen(value);
+        setFailed(null);
         try {
             setResult(
                 await postJson<AnswerResult>(answer.url(), {
@@ -151,8 +169,9 @@ function CardView({ card }: { card: Card }) {
                 }),
             );
         } catch (error) {
-            toast.error(errorMessage(error));
-            router.reload();
+            // stay on this card: the learner decides between retrying and reloading
+            setChosen(null);
+            setFailed({ message: errorMessage(error), value });
         } finally {
             setBusy(false);
         }
@@ -236,8 +255,39 @@ function CardView({ card }: { card: Card }) {
                 <ResultBanner
                     correct={!!correct}
                     overridden={overridden}
-                    expected={result.expected}
+                    expected={
+                        card.field === 'meaning' &&
+                        result.reveal.item.meanings[0]
+                            ? [result.reveal.item.meanings[0]]
+                            : result.expected
+                    }
                 />
+            )}
+
+            {failed && (
+                <div
+                    role="alert"
+                    className="flex flex-col gap-3 rounded-2xl bg-wrong-soft p-4 text-center"
+                >
+                    <p className="font-semibold text-wrong">{failed.message}</p>
+                    <div className="flex flex-wrap justify-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => void submit(failed.value)}
+                            disabled={busy}
+                            className="min-h-11 rounded-xl bg-primary px-5 font-semibold text-primary-foreground disabled:opacity-60"
+                        >
+                            Nochmal versuchen
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => router.reload()}
+                            className="min-h-11 rounded-xl px-5 font-semibold text-primary"
+                        >
+                            Seite neu laden
+                        </button>
+                    </div>
+                </div>
             )}
 
             {!done &&
@@ -367,6 +417,7 @@ function Choices({
         const onKey = (event: KeyboardEvent) => {
             const n = Number(event.key);
             if (
+                !event.repeat &&
                 n >= 1 &&
                 n <= options.length &&
                 !event.metaKey &&

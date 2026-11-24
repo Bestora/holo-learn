@@ -46,16 +46,25 @@ export default function Privacy() {
 
                     <h2>YouTube</h2>
                     <p>
-                        Nach einer Antwort spielt die Seite einen Ausschnitt aus
-                        einem YouTube-Video ab. Erst dann lädt dein Browser den
-                        Player von youtube-nocookie.com; dabei erhält Google
-                        unter anderem deine IP-Adresse. Vor der Antwort wird
-                        kein Player geladen.
+                        Die Seite zeigt kurze Ausschnitte aus YouTube-Videos:
+                        nach jeder Antwort und auf den Vorstellungskarten neuer
+                        Zeichen. Erst wenn ein Ausschnitt gezeigt wird, lädt
+                        dein Browser das Player-Skript von youtube.com und den
+                        Player selbst von youtube-nocookie.com. Dabei erhält
+                        Google unter anderem deine IP-Adresse. Auf einer
+                        Fragekarte vor der Antwort wird nichts von YouTube
+                        geladen.
                     </p>
                     <p>
                         Die Fotos der Talente lädt dein Browser direkt von
-                        Googles Bildservern (yt3.ggpht.com). Sie werden nicht
-                        auf diesem Server gespeichert.
+                        Googles Bildservern (yt3.ggpht.com), auch schon auf
+                        Fragekarten. Sie werden nicht auf diesem Server
+                        gespeichert.
+                    </p>
+                    <p>
+                        Meldet der Player, dass ein Video fehlt, fragt der
+                        Server bei YouTube nach, ob es das Video noch gibt.
+                        Dabei werden keine Daten über dich übertragen.
                     </p>
 
                     <h2>Holodex</h2>
