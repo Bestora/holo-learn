@@ -17,8 +17,7 @@ sudo mkdir /opt/holo-learn && sudo chown ubuntu: /opt/holo-learn
 git clone https://github.com/Bestora/holo-learn.git /opt/holo-learn
 cd /opt/holo-learn
 git checkout stufe-1
-nano .env    # Inhalt siehe unten, APP_KEY zunächst leer lassen
-docker compose run --rm app php artisan key:generate --show   # Ausgabe als APP_KEY eintragen
+sh docker/make-env.sh    # legt .env an (Inhalt siehe unten), erzeugt APP_KEY, fragt den Holodex-Key ab
 docker compose up -d --build
 docker compose ps    # app: healthy
 ```
