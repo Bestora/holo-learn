@@ -40,4 +40,19 @@ class RegistrationTest extends TestCase
         $this->assertAuthenticated();
         $response->assertRedirect(route('dashboard', absolute: false));
     }
+
+    public function test_invited_users_can_open_the_dashboard_without_email_verification()
+    {
+        Invitation::create(['token' => 'test-invite']);
+
+        $this->post(route('register.store'), [
+            'name' => 'Test User',
+            'email' => 'test@example.com',
+            'password' => 'password',
+            'password_confirmation' => 'password',
+            'invite' => 'test-invite',
+        ]);
+
+        $this->get(route('dashboard'))->assertOk();
+    }
 }

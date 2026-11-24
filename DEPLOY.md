@@ -11,9 +11,9 @@ Persistente Daten liegen in Docker-Volumes und überstehen Rebuilds:
 ## Erstes Deploy
 
 ```sh
-# Server braucht Lesezugriff auf das Repo (z. B. Deploy-Key)
+# Der Server hat keine GitHub-Zugangsdaten: per HTTPS klonen
 sudo mkdir /opt/holo-learn && sudo chown ubuntu: /opt/holo-learn
-git clone git@github.com:Bestora/holo-learn.git /opt/holo-learn
+git clone https://github.com/Bestora/holo-learn.git /opt/holo-learn
 cd /opt/holo-learn
 git checkout stufe-1
 nano .env    # Inhalt siehe unten, APP_KEY zunächst leer lassen
@@ -30,7 +30,6 @@ APP_ENV=production
 APP_DEBUG=false
 APP_KEY=base64:...
 APP_URL=https://holo-learn.u0x.de
-APP_LOCALE=de
 
 DB_CONNECTION=sqlite
 DB_DATABASE=/db/database.sqlite
@@ -42,10 +41,10 @@ QUEUE_CONNECTION=database
 
 HOLODEX_API_KEY=...
 
-# Ohne SMTP landen Mails (E-Mail-Bestätigung, Passwort-Reset) im Log.
-# Der log-Mailer schreibt auf Stufe debug, daher LOG_LEVEL=debug.
+# Kein Mailserver: Mails werden verworfen (der log-Mailer schreibt nur auf Stufe debug).
+# Wer sich mit Einladung registriert, ist sofort bestätigt.
 MAIL_MAILER=log
-LOG_LEVEL=debug
+LOG_LEVEL=warning
 # Mit SMTP stattdessen:
 # MAIL_MAILER=smtp
 # MAIL_HOST=...
@@ -54,13 +53,6 @@ LOG_LEVEL=debug
 # MAIL_PASSWORD=...
 # MAIL_FROM_ADDRESS=holo-learn@u0x.de
 # MAIL_FROM_NAME=holo-learn
-# LOG_LEVEL=info
-```
-
-Neue Konten müssen ihre E-Mail bestätigen. Bei `MAIL_MAILER=log` den Link so holen:
-
-```sh
-docker compose exec app grep -o 'https://holo-learn.u0x.de/email/verify/[^ ]*' storage/logs/laravel.log | tail -1
 ```
 
 ## Caddy

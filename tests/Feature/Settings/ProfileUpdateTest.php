@@ -40,7 +40,20 @@ class ProfileUpdateTest extends TestCase
 
         $this->assertSame('Test User', $user->name);
         $this->assertSame('test@example.com', $user->email);
-        $this->assertNull($user->email_verified_at);
+    }
+
+    public function test_changing_the_email_keeps_the_user_verified()
+    {
+        // No mail server: resetting verification would lock the user out of the dashboard.
+        $user = User::factory()->create();
+
+        $this->actingAs($user)->patch(route('profile.update'), [
+            'name' => $user->name,
+            'email' => 'new@example.com',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertNotNull($user->refresh()->email_verified_at);
+        $this->actingAs($user)->get(route('dashboard'))->assertOk();
     }
 
     public function test_email_is_stored_in_lowercase_so_the_user_can_still_log_in()

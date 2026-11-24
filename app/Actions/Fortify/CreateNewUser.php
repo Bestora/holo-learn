@@ -51,6 +51,8 @@ class CreateNewUser implements CreatesNewUsers
                 'email' => $input['email'],
                 'password' => $input['password'],
                 'is_admin' => $invitation->is_admin,
+                // The invitation is the trust anchor; there is no mail server to verify with.
+                'email_verified_at' => now(),
             ]);
         });
     }
