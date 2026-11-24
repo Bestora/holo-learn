@@ -27,7 +27,8 @@ Argumente: `$ARGUMENTS`
   Zeile `<fertige Pakete> <Pakete gesamt> Annotieren` nach `~/.claude/progress/<session_id>-annotate` schreiben
   (`<session_id>` steht im Scratchpad-Pfad). Bei JEDEM Ende, auch bei jedem vorzeitigen Abbruch:
   `rm -f ~/.claude/progress/<session_id>-annotate`.
-- Nie den Import auf dem Server ausführen, auch nicht per `ssh`.
+- Der Import auf dem Server ist erlaubt (Freigabe des Nutzers vom 2026-11-24), aber nur mit `--push` und
+  erst nach dem Push: `ssh ubuntu@u0x.de 'cd /opt/holo-learn && git pull --ff-only && docker compose exec -T scheduler php artisan annotations:import data/annotations/<stamp>.jsonl'`.
 - Ein Paket, das nichts liefert (Subagent scheitert oder schreibt 0 Zeilen), wird übersprungen, nicht im
   selben Lauf wiederholt.
 
@@ -131,8 +132,7 @@ git commit -m "Add annotations <YYYY-MM-DD> (<lines> Zeilen)" -- data/annotation
 Nur wenn der Aufruf `--push` enthielt: `git push origin HEAD`. Sonst bleibt der Commit lokal, und das
 sagst du dem Nutzer.
 
-Hinweis für den Nutzer (nicht ausführen): Nach dem Deploy importiert der Server mit
-`git pull && docker compose exec app php artisan annotations:import`.
+Mit `--push` danach auf dem Server importieren (Befehl siehe Regeln) und dessen Schlusszeile festhalten.
 
 ### 7. Abschlussbericht (Deutsch)
 
