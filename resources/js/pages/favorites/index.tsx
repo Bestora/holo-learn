@@ -7,7 +7,7 @@ import { index, update } from '@/routes/favorites';
 
 type FavoriteTalent = {
     id: number;
-    name_ja: string;
+    name_ja: string | null;
     name_en: string;
     photo_url: string | null;
     group_name: string | null;
@@ -81,8 +81,8 @@ export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
     const shown = talents.filter(
         (t) =>
             !q ||
-            t.name_en.toLowerCase().includes(q) ||
-            t.name_ja.includes(q) ||
+            (t.name_en ?? '').toLowerCase().includes(q) ||
+            (t.name_ja ?? '').includes(q) ||
             (t.group_name ?? '').toLowerCase().includes(q),
     );
     // groups in the order of their first talent (the list comes sorted by priority)
