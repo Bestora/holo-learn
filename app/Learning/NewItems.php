@@ -16,8 +16,8 @@ class NewItems
 
     /**
      * Items with at least `min_references[kind]` verified references (kana: always; radicals: with
-     * meanings), best first: level asc, verified references desc, id (kana without references thus in
-     * gojūon order). With a user: not reviewed yet, specials setting applied, and radicals only once a
+     * meanings), best first: level asc, kanji before vocab, verified references desc (not for kana), id
+     * (kana thus in gojūon order). With a user: not reviewed yet, specials setting applied, and radicals only once a
      * kanji containing them is reviewed.
      *
      * @return Collection<int, Item>
@@ -49,9 +49,10 @@ class NewItems
         // cached per-item count if the reference table grows into the hundreds of thousands.
         $counts = $items->mapWithKeys(fn (Item $item) => [$item->id => $item->references->unique('id')->count()]);
         $items->each->unsetRelation('references');
+        $rank = fn (Item $item) => Question::isKana($item) ? 0 : $counts[$item->id]; // kana: by id, the seeder's gojūon order
 
         return $items->filter(fn (Item $item) => $counts[$item->id] >= ($min[$item->kind] ?? 0))
-            ->sort(fn (Item $a, Item $b) => [$a->level, $counts[$b->id], $a->id] <=> [$b->level, $counts[$a->id], $b->id])
+            ->sort(fn (Item $a, Item $b) => [$a->level, $a->kind === 'vocab', $rank($b), $a->id] <=> [$b->level, $b->kind === 'vocab', $rank($a), $b->id])
             ->values();
     }
 

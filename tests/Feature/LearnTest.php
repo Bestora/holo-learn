@@ -91,8 +91,8 @@ class LearnTest extends TestCase
     public function test_first_lesson_starts_with_an_intro_for_the_lowest_level_eligible_item(): void
     {
         $this->withRefs($this->kana('ネ'), 6);  // katakana: higher level
-        $this->withRefs($this->kana('ね'), 3);
-        $this->withRefs($this->kana('に'), 4);  // same level, more references → first
+        $this->withRefs($this->kana('い'), 6);  // more references, but gojūon order first
+        $this->withRefs($this->kana('あ'), 4);
         $this->withRefs($this->kana('の'), 2);  // too few verified ones
         $this->withRefs($this->kana('の'), 3, 'rejected');
         $this->withRefs($this->kana('の'), 3, 'annotated');
@@ -101,7 +101,7 @@ class LearnTest extends TestCase
         $this->get(route('learn.index'))->assertInertia(fn (AssertableInertia $page) => $page
             ->component('learn/index')
             ->where('card.type', 'intro')
-            ->where('card.item.characters', 'に')
+            ->where('card.item.characters', 'あ')
             ->where('lesson.position', 0)
             ->where('summary', null)
             ->where('nothing_due', null));
@@ -109,7 +109,7 @@ class LearnTest extends TestCase
         $props = $this->learnProps();
         $this->assertSame(3, $props['card']['remaining_references']);
         $this->assertSame([0], $props['card']['reference']['highlight']);
-        $this->assertSame(['ni'], $props['card']['reveal']['item']['readings']);
+        $this->assertSame(['a'], $props['card']['reveal']['item']['readings']);
         $this->assertNotNull($props['card']['reveal']['occurrence']['video_id']);
     }
 
@@ -139,23 +139,23 @@ class LearnTest extends TestCase
 
     public function test_intro_is_followed_by_a_choice_quiz_that_leaks_no_answer_and_survives_reload(): void
     {
-        $ne = $this->kana('ね');
-        $this->withRefs($ne, 4);
+        $a = $this->kana('あ');
+        $this->withRefs($a, 4);
         $this->actingAs($this->learner());
 
         $intro = $this->learnProps()['card'];
         $this->assertSame('intro', $intro['type']);
-        $this->postJson(route('learn.answer'), ['item_id' => $ne->id, 'answer' => 'ne'])->assertStatus(422); // intro is not a quiz
-        $this->confirmIntro($ne->id);
-        $this->postJson(route('learn.intro'), ['item_id' => $ne->id])->assertStatus(422); // already confirmed
+        $this->postJson(route('learn.answer'), ['item_id' => $a->id, 'answer' => 'a'])->assertStatus(422); // intro is not a quiz
+        $this->confirmIntro($a->id);
+        $this->postJson(route('learn.intro'), ['item_id' => $a->id])->assertStatus(422); // already confirmed
 
         $review = Review::query()->sole();
-        $this->assertSame([0, $ne->id], [$review->stage, $review->item_id]);
+        $this->assertSame([0, $a->id], [$review->stage, $review->item_id]);
         $this->assertTrue($review->due_at->lte(now()));
 
         $props = $this->learnProps();
         $card = $props['card'];
-        $this->assertSame(['quiz', 'reading', 'choice', $ne->id], [$card['type'], $card['field'], $card['mode'], $card['item']['id']]);
+        $this->assertSame(['quiz', 'reading', 'choice', $a->id], [$card['type'], $card['field'], $card['mode'], $card['item']['id']]);
         $this->assertNotSame($intro['reference']['id'], $card['reference']['id']); // no reference twice in a lesson
         $this->assertSame([], array_values(array_intersect(self::FORBIDDEN, $this->keys($card))));
         $this->assertSame(['id', 'kind', 'characters', 'is_special'], array_keys($card['item']));
@@ -273,23 +273,23 @@ class LearnTest extends TestCase
 
     public function test_never_the_same_reference_twice_in_a_row_across_twenty_reviews(): void
     {
-        config(['hololearn.new_items_per_day' => 1]); // only ね
-        $ne = $this->kana('ね');
-        $this->withRefs($ne, 5);
+        config(['hololearn.new_items_per_day' => 1]); // only あ
+        $a = $this->kana('あ');
+        $this->withRefs($a, 5);
         $this->actingAs($this->learner());
 
         $previous = null;
         for ($i = 0; $i < 20; $i++) {
             $card = $this->nextCard();
             if ($card['type'] === 'intro') {
-                $this->confirmIntro($ne->id);
-                $this->noNewItems(); // only ね, also on later days
+                $this->confirmIntro($a->id);
+                $this->noNewItems(); // only あ, also on later days
                 $previous = $card['reference']['id'];
                 $card = $this->nextCard();
             }
             $this->assertNotSame($previous, $card['reference']['id'], "review {$i}");
             $previous = $card['reference']['id'];
-            $i % 3 === 2 ? $this->answer($ne->id, $this->wrongAnswer($card)) : $this->answer($ne->id, $this->rightAnswer($card));
+            $i % 3 === 2 ? $this->answer($a->id, $this->wrongAnswer($card)) : $this->answer($a->id, $this->rightAnswer($card));
             $this->travelTo(Review::query()->sole()->due_at->addMinute());
         }
     }
@@ -608,6 +608,27 @@ class LearnTest extends TestCase
         Review::query()->update(['stage' => 3, 'due_at' => now()->subMinute()]);
         $this->learnProps();
         $this->assertTrue($this->answer($horse->id, 'hors')['correct']);
+    }
+
+    public function test_a_typo_that_is_a_synonym_from_a_related_item_is_right(): void
+    {
+        config(['hololearn.new_items_per_day' => 0]);
+        $user = $this->learner();
+        $color = $this->makeItem('kanji', '色', ['いろ'], ['color'], 10);
+        $this->withRefs($color, 2, context: 'いろ');
+        $this->review($user, $color, 3);
+        $this->actingAs($user);
+
+        $sameCharacters = $this->makeItem('vocab', '色', ['いろ'], ['colour'], 10);
+        $this->learnProps();
+        $this->assertTrue($this->answer($color->id, 'colour')['correct']);
+
+        $sameCharacters->delete();
+        $this->makeItem('vocab', 'カラー', ['からー'], ['Color', 'colour'], 2); // shares 'color'
+        Lesson::query()->delete();
+        Review::query()->update(['stage' => 3, 'due_at' => now()->subMinute()]);
+        $this->learnProps();
+        $this->assertTrue($this->answer($color->id, 'colour')['correct']);
     }
 
     public function test_nothing_due_tells_when_new_items_return(): void

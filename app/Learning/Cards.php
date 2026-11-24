@@ -125,14 +125,21 @@ class Cards
 
     /**
      * Normalised meanings of every other item, so a typo match that is another real word counts wrong.
+     * Not those of related items (same characters, or a shared meaning): their meanings are synonyms
+     * (色: color / colour).
      *
      * @return array<string, true>
      */
     public function otherMeanings(int $itemId): array
     {
-        $meanings = Item::query()->whereKeyNot($itemId)->whereNotIn('kind', ['hiragana', 'katakana'])->pluck('meanings')->flatten()->all();
+        $item = Item::query()->findOrFail($itemId);
+        $normalize = fn (array $meanings) => array_map(AnswerChecker::normalizeMeaning(...), $meanings);
+        $own = $normalize($item->meanings);
+        $meanings = Item::query()->whereKeyNot($itemId)->whereNotIn('kind', ['hiragana', 'katakana'])
+            ->where('characters', '!=', $item->characters)->pluck('meanings')
+            ->map($normalize)->reject(fn (array $m) => array_intersect($m, $own) !== [])->flatten()->all();
 
-        return array_fill_keys(array_map(fn (string $m) => AnswerChecker::normalizeMeaning($m), $meanings), true);
+        return array_fill_keys($meanings, true);
     }
 
     /**

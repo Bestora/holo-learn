@@ -97,11 +97,11 @@ class NewItemsTest extends TestCase
         $this->withRefs($few, 5, 'rejected');
         $twice = $this->makeItem('kanji', 'E', ['e'], ['e'], 1);
         $this->makeRef([[$twice, 0], [$twice, 1]]);                               // one reference, linked twice
-        $this->withRefs($this->makeItem('vocab', 'V', ['v'], ['v'], 11), 1);      // vocab: 1 reference
+        $this->withRefs($this->makeItem('vocab', 'V', ['v'], ['v'], 11), 1);      // vocab: 1 reference, after the level's kanji and radicals
         $this->withRefs($this->makeItem('radical', 'R', [], [], 0), 5);          // radical without meanings
         $this->withRefs($this->makeItem('radical', 'Q', [], ['q'], 11), 1);
 
-        $this->assertSame(['あ', 'C', 'A', 'B', 'V', 'Q'], $this->newItems()->eligible()->pluck('characters')->all());
+        $this->assertSame(['あ', 'C', 'A', 'B', 'Q', 'V'], $this->newItems()->eligible()->pluck('characters')->all());
         $this->assertSame(['hiragana' => 1, 'katakana' => 0, 'radical' => 1, 'kanji' => 3, 'vocab' => 1], $this->newItems()->availableCounts());
 
         $user = $this->learner();
@@ -111,7 +111,7 @@ class NewItemsTest extends TestCase
         $this->assertSame(['A', 'B', 'V'], $this->newItems()->eligible($user)->pluck('characters')->all()); // Q: no kanji of it reviewed
     }
 
-    public function test_every_kana_is_taught_those_with_references_first(): void
+    public function test_every_kana_is_taught_in_gojuon_order_regardless_of_references(): void
     {
         $this->seed(KanaSeeder::class);
         $hiragana = fn (string $c) => Item::query()->where(['kind' => 'hiragana', 'characters' => $c])->sole();
@@ -121,8 +121,21 @@ class NewItemsTest extends TestCase
         $eligible = $this->newItems()->eligible($this->learner());
 
         $this->assertSame(142, $eligible->count());
-        $this->assertSame(['に', 'ね', 'あ', 'い', 'う'], $eligible->take(5)->pluck('characters')->all());
+        $this->assertSame(['あ', 'い', 'う', 'え', 'お', 'か'], $eligible->take(6)->pluck('characters')->all());
+        $this->assertSame(['ん', 'が'], $eligible->slice(45, 2)->pluck('characters')->values()->all());
         $this->assertSame(array_fill(0, 71, 'hiragana'), $eligible->take(71)->pluck('kind')->all());
+        $this->assertSame(['ア', 'イ', 'ウ'], $eligible->slice(71, 3)->pluck('characters')->values()->all());
+    }
+
+    public function test_kanji_come_before_vocabulary_within_a_level(): void
+    {
+        $this->withRefs($this->makeItem('vocab', '少女', ['しょうじょ'], ['girl'], 10), 5);
+        $this->withRefs($this->makeItem('kanji', '少', ['しょう'], ['few'], 10), 2);
+        $this->withRefs($this->makeItem('kanji', '好', ['こう'], ['like'], 10), 3);
+        $this->withRefs($this->makeItem('vocab', '好き', ['すき'], ['liked'], 10), 1);
+        $this->withRefs($this->makeItem('vocab', '人', ['ひと'], ['person'], 9), 1);
+
+        $this->assertSame(['人', '好', '少', '少女', '好き'], $this->newItems()->eligible()->pluck('characters')->all());
     }
 
     private function kanjiWithRadicals(string $kanji, array $radicals): Item
