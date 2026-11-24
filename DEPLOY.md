@@ -2,7 +2,8 @@
 
 Docker Compose mit drei Diensten aus einem Image (`docker/Dockerfile`, FrankenPHP/PHP 8.4):
 `app` (Web, `127.0.0.1:8520`), `queue`, `scheduler`. Der Caddy des Hosts terminiert TLS.
-Nur `app` führt beim Start `migrate --force` und die Caches aus.
+Nur `app` führt beim Start `migrate --force` und die Caches aus. Manuelle Befehle laufen im
+`scheduler` (384 MB statt 256 MB) oder in einem Einmal-Container, nicht im Web-Container.
 
 Persistente Daten liegen in Docker-Volumes und überstehen Rebuilds:
 `holo-learn_db` (SQLite unter `/db/database.sqlite`) und `holo-learn_storage` (`storage/`).
@@ -44,6 +45,7 @@ HOLODEX_API_KEY=...
 # Kein Mailserver: Mails werden verworfen (der log-Mailer schreibt nur auf Stufe debug).
 # Wer sich mit Einladung registriert, ist sofort bestätigt.
 MAIL_MAILER=log
+LOG_CHANNEL=stderr
 LOG_LEVEL=warning
 # Mit SMTP stattdessen:
 # MAIL_MAILER=smtp
@@ -81,17 +83,20 @@ curl -s https://api.github.com/repos/scriptin/jmdict-simplified/releases/latest 
   | grep -oE 'https://[^"]+/(jmdict-eng-[0-9]|jmnedict-all-|kanjidic2-en-|kradfile-)[^"/]*\.json\.tgz' \
   | xargs -n1 curl -sSLO
 for f in *.tgz; do tar xzf "$f" && rm "$f"; done
+ls *.json | wc -l   # muss 4 sein (jmdict-eng, jmnedict-all, kanjidic2-en, kradfile)
 cd /opt/holo-learn
 docker compose run --rm -v /tmp/dict:/dict:ro app php artisan dict:import /dict
 rm -rf /tmp/dict
 
-docker compose exec app php artisan db:seed --class=KanaSeeder --force
-docker compose exec app php artisan holodex:sync          # kann Stunden dauern
-docker compose exec app php artisan annotations:import
-docker compose exec app php artisan invite:create --admin # gibt den Registrierungslink aus
+docker compose exec scheduler php artisan db:seed --class=KanaSeeder --force
+docker compose exec scheduler php artisan holodex:sync          # kann Stunden dauern
+docker compose exec scheduler php artisan annotations:import
+docker compose exec scheduler php artisan invite:create --admin # gibt den Registrierungslink aus
 ```
 
 `holodex:sync` läuft danach täglich um 03:30 (Sonntag 04:30 voll) über den `scheduler`.
+Die Zeiten gelten in Europe/Berlin, weil `compose.yaml` `TZ` und `SCHEDULE_TIMEZONE` setzt;
+ohne diese Variablen wären es UTC. Zeitstempel in der Datenbank bleiben UTC.
 
 ## Update
 
@@ -102,10 +107,10 @@ cd /opt/holo-learn && git pull && docker compose up -d --build
 Nach neuen Annotationen:
 
 ```sh
-cd /opt/holo-learn && git pull && docker compose exec app php artisan annotations:import
+cd /opt/holo-learn && git pull && docker compose exec scheduler php artisan annotations:import
 ```
 
-Weitere Einladung: `docker compose exec app php artisan invite:create`
+Weitere Einladung: `docker compose exec scheduler php artisan invite:create`
 
 ## Wörterbuch monatlich aktualisieren
 
@@ -126,7 +131,9 @@ docker compose exec app rm /db/backup.sqlite
 ## Logs
 
 ```sh
-docker compose logs -f app queue scheduler
-docker compose exec app tail -f storage/logs/laravel.log
+docker compose logs -f app queue scheduler     # inkl. Laravel-Log (LOG_CHANNEL=stderr)
+docker compose logs --since 24h scheduler       # z. B. nächtlicher holodex:sync
 docker compose exec scheduler php artisan schedule:list
 ```
+
+Docker rotiert die Logs (json-file, 3 × 10 MB je Dienst), im Volume wächst nichts.

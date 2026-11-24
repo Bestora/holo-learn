@@ -10,6 +10,7 @@
 node_modules
 vendor
 tests
+data
 docs
 storage/*
 bootstrap/cache/*.php

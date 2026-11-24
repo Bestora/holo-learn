@@ -67,6 +67,9 @@ return [
 
     'timezone' => 'UTC',
 
+    // Schedule times (routes/console.php) are read in this zone; timestamps stay UTC.
+    'schedule_timezone' => env('SCHEDULE_TIMEZONE', 'UTC'),
+
     /*
     |--------------------------------------------------------------------------
     | Application Locale Configuration

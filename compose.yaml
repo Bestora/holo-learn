@@ -1,8 +1,18 @@
 x-app: &app
     image: holo-learn
+    # local image built by `app`; never look for it on Docker Hub
+    pull_policy: never
     env_file: .env
     restart: unless-stopped
     mem_limit: 256m
+    environment:
+        TZ: Europe/Berlin
+        SCHEDULE_TIMEZONE: Europe/Berlin
+    logging:
+        driver: json-file
+        options:
+            max-size: 10m
+            max-file: '3'
     # The FrankenPHP base image ships a healthcheck for its web server; only `app` runs one.
     healthcheck:
         disable: true
@@ -14,6 +24,7 @@ x-app: &app
 services:
     app:
         <<: *app
+        pull_policy: build
         build:
             context: .
             dockerfile: docker/Dockerfile
@@ -36,6 +47,8 @@ services:
     scheduler:
         <<: *app
         command: [php, artisan, schedule:work]
+        # also runs holodex:sync and the manual one-off commands
+        mem_limit: 384m
         depends_on:
             app:
                 condition: service_healthy
