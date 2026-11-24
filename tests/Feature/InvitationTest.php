@@ -86,6 +86,7 @@ class InvitationTest extends TestCase
             ->assertSessionHasErrors(['invite' => 'This invitation is invalid or has already been used.']);
 
         $this->assertSame(0, User::count());
+        Invitation::flushEventListeners();
     }
 
     public function test_rejects_a_used_invite()
@@ -94,6 +95,33 @@ class InvitationTest extends TestCase
 
         $this->post('/register', $this->validUserData() + ['invite' => 'abc'])->assertSessionHasErrors('invite');
         $this->assertSame(0, User::count());
+    }
+
+    public function test_taken_email_cannot_be_probed_without_a_redeemable_invite()
+    {
+        User::factory()->create(['email' => 'taken@example.com']);
+        Invitation::create(['token' => 'used', 'uses' => 1]);
+
+        foreach ([[], ['invite' => 'nope'], ['invite' => 'used']] as $invite) {
+            $this->post('/register', $this->validUserData('taken@example.com') + $invite)
+                ->assertSessionHasErrors('invite')->assertSessionDoesntHaveErrors('email');
+        }
+    }
+
+    public function test_registration_is_limited_to_five_attempts_per_minute()
+    {
+        for ($i = 0; $i < 5; $i++) {
+            $this->post('/register', $this->validUserData() + ['invite' => 'nope'])->assertSessionHasErrors('invite');
+        }
+
+        $this->post('/register', $this->validUserData() + ['invite' => 'nope'])->assertTooManyRequests();
+    }
+
+    public function test_admin_invitations_are_single_use()
+    {
+        $this->expectException(\LogicException::class);
+
+        Invitation::create(['token' => 'abc', 'is_admin' => true, 'max_uses' => 2]);
     }
 
     public function test_register_page_passes_invite_from_query()

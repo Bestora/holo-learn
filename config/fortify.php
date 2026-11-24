@@ -162,7 +162,7 @@ return [
 
     'features' => [
         Features::registration(),
-        Features::resetPasswords(),
+        // Features::resetPasswords(), // no mail server; see DEPLOY.md for a manual reset
         Features::emailVerification(),
         Features::twoFactorAuthentication([
             'confirm' => true,

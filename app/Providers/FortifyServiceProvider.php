@@ -3,15 +3,14 @@
 namespace App\Providers;
 
 use App\Actions\Fortify\CreateNewUser;
-use App\Actions\Fortify\ResetUserPassword;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rules\Password;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
 class FortifyServiceProvider extends ServiceProvider
@@ -39,7 +38,6 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureActions(): void
     {
-        Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
     }
 
@@ -48,18 +46,8 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureViews(): void
     {
+        // no password reset: there is no mail server (DEPLOY.md resets passwords with tinker)
         Fortify::loginView(fn (Request $request) => Inertia::render('auth/login', [
-            'canResetPassword' => Features::enabled(Features::resetPasswords()),
-            'status' => $request->session()->get('status'),
-        ]));
-
-        Fortify::resetPasswordView(fn (Request $request) => Inertia::render('auth/reset-password', [
-            'email' => $request->email,
-            'token' => $request->route('token'),
-            'passwordRules' => Password::defaults()->toPasswordRulesString(),
-        ]));
-
-        Fortify::requestPasswordResetLinkView(fn (Request $request) => Inertia::render('auth/forgot-password', [
             'status' => $request->session()->get('status'),
         ]));
 
@@ -90,6 +78,13 @@ class FortifyServiceProvider extends ServiceProvider
             $throttleKey = Str::transliterate(Str::lower($request->input(Fortify::username())).'|'.$request->ip());
 
             return Limit::perMinute(5)->by($throttleKey);
+        });
+
+        // Fortify has no registration limiter setting, so the route gets the throttle itself.
+        RateLimiter::for('register', fn (Request $request) => Limit::perMinute(5)->by($request->ip()));
+        $this->app->booted(function () {
+            Route::getRoutes()->refreshNameLookups(); // Fortify names its routes after adding them
+            Route::getRoutes()->getByName('register.store')?->middleware('throttle:register');
         });
 
         RateLimiter::for('passkeys', function (Request $request) {

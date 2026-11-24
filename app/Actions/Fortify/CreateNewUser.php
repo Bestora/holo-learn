@@ -25,20 +25,24 @@ class CreateNewUser implements CreatesNewUsers
     {
         $invalidInvite = 'This invitation is invalid or has already been used.';
 
-        Validator::make($input, [
-            ...$this->profileRules(),
-            'password' => $this->passwordRules(),
-            'invite' => ['required', 'string'],
-        ], [
+        // The invitation first, so profile rules (unique email) cannot be probed without one.
+        Validator::make($input, ['invite' => ['required', 'string']], [
             'invite.required' => 'You can only register with an invitation.',
             'invite.string' => $invalidInvite,
         ])->validate();
+        $invitation = Invitation::firstWhere('token', $input['invite']);
+        if (! $invitation?->isRedeemable()) {
+            throw ValidationException::withMessages(['invite' => $invalidInvite]);
+        }
 
-        return DB::transaction(function () use ($input, $invalidInvite) {
-            $invitation = Invitation::firstWhere('token', $input['invite']);
+        Validator::make($input, [
+            ...$this->profileRules(),
+            'password' => $this->passwordRules(),
+        ])->validate();
 
+        return DB::transaction(function () use ($input, $invalidInvite, $invitation) {
             // Conditional increment so concurrent registrations cannot exceed max_uses.
-            $claimed = $invitation?->isRedeemable() && Invitation::whereKey($invitation->id)
+            $claimed = Invitation::whereKey($invitation->id)
                 ->redeemable()
                 ->increment('uses', 1, ['used_at' => now()]);
 

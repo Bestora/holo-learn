@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Carbon;
+use LogicException;
 
 /**
  * @property int $id
@@ -34,6 +35,15 @@ class Invitation extends Model
             'expires_at' => 'datetime',
             'used_at' => 'datetime',
         ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $invitation) {
+            if ($invitation->is_admin && $invitation->max_uses > 1) {
+                throw new LogicException('Admin invitations are single-use.');
+            }
+        });
     }
 
     /** @return HasMany<User, $this> */

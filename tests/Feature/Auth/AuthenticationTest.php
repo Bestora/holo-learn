@@ -19,6 +19,13 @@ class AuthenticationTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_password_reset_is_disabled_without_a_mail_server()
+    {
+        $this->get(route('login'))->assertInertia(fn ($page) => $page->component('auth/login')->missing('canResetPassword'));
+        $this->get('/forgot-password')->assertNotFound();
+        $this->post('/forgot-password', ['email' => 'a@example.com'])->assertNotFound();
+    }
+
     public function test_users_can_authenticate_using_the_login_screen()
     {
         $user = User::factory()->create();
