@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AdminController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\LearnController;
@@ -7,6 +8,7 @@ use App\Http\Controllers\OccurrenceController;
 use Illuminate\Support\Facades\Route;
 
 Route::inertia('/', 'welcome')->name('home');
+Route::inertia('datenschutz', 'privacy')->name('privacy');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('dashboard', DashboardController::class)->name('dashboard');
@@ -21,6 +23,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('favorites', [FavoriteController::class, 'index'])->name('favorites.index');
     Route::put('favorites', [FavoriteController::class, 'update'])->name('favorites.update');
+
+    Route::get('admin/rejected', [AdminController::class, 'rejected'])->name('admin.rejected');
 });
 
 require __DIR__.'/settings.php';
