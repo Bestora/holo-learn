@@ -8,6 +8,10 @@ use App\Japanese\Kana;
 class AnswerChecker
 {
     /**
+     * Kana items (Hepburn expected) compare loosely; readings exactly, so a wrong long vowel
+     * (しゅじん for しゅうじん) is wrong. Only ー equals the same vowel repeated (こーひー = こおひい),
+     * and romaji, which cannot tell づ/ぢ from ず/じ, gets those two pairs merged.
+     *
      * @param  list<string>  $expected  kana readings, or Hepburn romaji for kana items
      */
     public static function reading(string $input, array $expected): bool
@@ -18,15 +22,31 @@ class AnswerChecker
         }
 
         $compact = mb_strtolower(preg_replace('/\s+/u', '', $input) ?? '');
-        $kana = self::asKana($input);
+        $kana = self::asKana($compact);
+        $romaji = $kana !== $compact;
 
         foreach ($expected as $reading) {
-            if ($compact === mb_strtolower($reading) || Kana::looselyEqual($kana, self::asKana($reading))) {
+            $matches = preg_match('/[a-z]/i', $reading) === 1
+                ? $compact === mb_strtolower($reading) || Kana::looselyEqual($kana, self::asKana($reading))
+                : self::exactKey($kana, $romaji) === self::exactKey($reading, $romaji);
+            if ($matches) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** Hiragana with every ー spelled as the vowel before it; づ/ぢ as ず/じ when compared with romaji. */
+    private static function exactKey(string $kana, bool $romaji): string
+    {
+        $vowels = ['a' => 'あ', 'i' => 'い', 'u' => 'う', 'e' => 'え', 'o' => 'お'];
+        $out = '';
+        foreach (mb_str_split(Kana::toHiragana($kana)) as $char) {
+            $out .= $char === 'ー' && $out !== '' ? $vowels[substr(Kana::toRomaji(mb_substr($out, -1)), -1)] ?? $char : $char;
+        }
+
+        return $romaji ? strtr($out, ['づ' => 'ず', 'ぢ' => 'じ']) : $out;
     }
 
     /**
@@ -75,8 +95,9 @@ class AnswerChecker
         return Kana::loose(self::asKana($reading));
     }
 
+    /** Romaji → kana, a typed - as ー (ko-hi- → こーひー). */
     private static function asKana(string $text): string
     {
-        return preg_match('/[a-z]/i', $text) === 1 ? Kana::fromRomaji($text) : $text;
+        return preg_match('/[a-z]/i', $text) === 1 ? Kana::fromRomaji(str_replace('-', 'ー', $text)) : $text;
     }
 }

@@ -19,7 +19,7 @@ class VocabMatcher
      * @param  list<int>  $loanwords  katakana words
      * @param  list<array<string, mixed>>  $words
      * @param  Collection<string, DictKanji>  $dictKanji  at least the kanji of the words and lemmas
-     * @return array<int, array{spelling: string, readings: list<string>, meanings: list<string>, level: array{int, bool}}> per word index
+     * @return array<int, array{spelling: string, reading: string, readings: list<string>, meanings: list<string>, level: array{int, bool}}> per word index; reading = the one that matched
      */
     public static function match(array $indexes, array $loanwords, array $words, Collection $dictKanji): array
     {
@@ -31,7 +31,8 @@ class VocabMatcher
             $entry = self::loanword($words[$i]['surface'], $dictionary[$words[$i]['surface']] ?? collect());
             if ($entry !== null) {
                 $meanings = array_slice(array_values(array_unique(array_merge(...$entry->glosses))), 0, 5);
-                $vocab[$i] = ['spelling' => $words[$i]['surface'], 'readings' => [Kana::toHiragana($words[$i]['reading'])], 'meanings' => $meanings, 'level' => ItemLevel::vocab($entry->common, [])];
+                $reading = Kana::toHiragana($words[$i]['reading']);
+                $vocab[$i] = ['spelling' => $words[$i]['surface'], 'reading' => $reading, 'readings' => [$reading], 'meanings' => $meanings, 'level' => ItemLevel::vocab($entry->common, [])];
             }
         }
         foreach ($indexes as $i) {
@@ -43,7 +44,8 @@ class VocabMatcher
                     $kanji = array_map(fn (string $char) => ItemLevel::kanji($dictKanji[$char]->jlpt ?? null, $dictKanji[$char]->grade ?? null), Kana::kanjiIn($spelling));
                     $vocab[$i] = [
                         'spelling' => $spelling,
-                        'readings' => array_values(array_unique($rows->map(fn (DictWord $w) => Kana::toHiragana($w->reading))->all())),
+                        'reading' => $reading,
+                        'readings' => self::entryReadings($rows, $match),
                         'meanings' => array_slice(array_values(array_unique(array_merge(...$match->glosses))), 0, 5),
                         'level' => ItemLevel::vocab($rows->contains('common', true), $kanji),
                     ];
@@ -54,6 +56,19 @@ class VocabMatcher
         }
 
         return $vocab;
+    }
+
+    /**
+     * Readings of the matched entry only, never of a homograph with the same spelling (一番:
+     * いちばん, not ひとつがい). dict_words has no entry id, so an entry is the rows with the
+     * match's glosses; a reading whose senses differ is left out, which errs on the safe side.
+     *
+     * @param  Collection<int, DictWord>  $rows  all rows of the spelling
+     * @return list<string>
+     */
+    public static function entryReadings(Collection $rows, DictWord $match): array
+    {
+        return array_values(array_unique($rows->filter(fn (DictWord $w) => $w->glosses === $match->glosses)->map(fn (DictWord $w) => Kana::toHiragana($w->reading))->all()));
     }
 
     /**

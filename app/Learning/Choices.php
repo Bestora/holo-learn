@@ -26,7 +26,7 @@ class Choices
     public function options(Item $item, string $field, string $correct, array $expected): ?array
     {
         $options = [$correct];
-        $keys = [$this->key($field, $correct)];
+        $keys = array_map(fn (string $e) => $this->key($field, $e), [$correct, ...$expected]); // no near-duplicate (こ for こう) of any accepted answer
         $others = Item::query()->whereKeyNot($item->id)->get();
 
         foreach ($this->groups($item, $field) as $groups) {

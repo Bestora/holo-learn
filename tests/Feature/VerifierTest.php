@@ -66,6 +66,20 @@ class VerifierTest extends TestCase
         $this->assertSame([false], $this->okFlags($reference));
     }
 
+    public function test_lone_kanji_without_romaji_needs_a_common_dictionary_reading(): void
+    {
+        $unchecked = $this->annotated('song', '湊', 'みなと', [['湊', 'みなと']]); // みなと row not common
+        $romaji = $this->annotated('song', '湊!', 'みなと', [['湊', 'みなと']], 'Minato!', 'romaji');
+        $common = $this->annotated('song', '花', 'はな', [['花', 'はな']]);
+
+        $this->assertSame([], $this->verify($unchecked));
+        $this->assertSame([false], $this->okFlags($unchecked));
+        $this->assertSame([], $this->verify($romaji));
+        $this->assertSame([true], $this->okFlags($romaji));
+        $this->assertSame([], $this->verify($common));
+        $this->assertSame([true], $this->okFlags($common));
+    }
+
     public function test_reading_with_non_kana_is_rejected(): void
     {
         $reference = $this->hanaNiBourei('はなにボウレイx');

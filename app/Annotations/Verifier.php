@@ -65,7 +65,8 @@ class Verifier
                 Kana::kanjiIn($word['surface']) === [] => false, // Latin, digits, symbols
                 ! self::fitsSkeleton($word['surface'], $word['reading']) => false,
                 $romajiOk === true && $ref->kind === 'name' => true,
-                default => $this->inDictionary($word, $dictionary),
+                // no romaji to confirm it: a lone kanji has too many readings, only a common one counts
+                default => $this->inDictionary($word, $dictionary, $romajiOk === null && $ref->kind !== 'name' && mb_strlen($word['surface']) === 1),
             };
         }
 
@@ -179,10 +180,10 @@ class Verifier
      * @param  array<string, mixed>  $word
      * @param  Collection<array-key, Collection<int, DictWord>>  $dictionary
      */
-    private function inDictionary(array $word, Collection $dictionary): bool
+    private function inDictionary(array $word, Collection $dictionary, bool $commonOnly = false): bool
     {
         $hasReading = fn (string $spelling, string $reading, bool $namesToo) => ($dictionary[$spelling] ?? collect())
-            ->contains(fn (DictWord $w) => ($namesToo || ! $w->is_name) && Kana::toHiragana($w->reading) === Kana::toHiragana($reading));
+            ->contains(fn (DictWord $w) => ($namesToo || ! $w->is_name) && (! $commonOnly || $w->common) && Kana::toHiragana($w->reading) === Kana::toHiragana($reading));
 
         if (isset($dictionary[$word['surface']])) {
             return $hasReading($word['surface'], $word['reading'], true);

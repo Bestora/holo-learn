@@ -34,11 +34,53 @@ class AnswerCheckerTest extends TestCase
         $this->assertFalse(AnswerChecker::reading('bana', ['はな']));
     }
 
-    public function test_long_vowels_are_loose(): void
+    public function test_a_wrong_long_vowel_is_wrong(): void
     {
-        $this->assertTrue(AnswerChecker::reading('kyo', ['きょう']));
-        $this->assertTrue(AnswerChecker::reading('boorei', ['ぼうれい']));
-        $this->assertTrue(AnswerChecker::reading('ぼーれー', ['ぼうれい']));
+        $this->assertFalse(AnswerChecker::reading('しゅじん', ['しゅうじん']));
+        $this->assertFalse(AnswerChecker::reading('shujin', ['しゅうじん']));
+        $this->assertFalse(AnswerChecker::reading('kyo', ['きょう']));
+        $this->assertFalse(AnswerChecker::reading('boorei', ['ぼうれい'])); // おお is not おう
+        $this->assertFalse(AnswerChecker::reading('ぼーれー', ['ぼうれい']));
+        $this->assertFalse(AnswerChecker::reading('こうひい', ['こーひー'])); // ー is the same vowel again, not う
+    }
+
+    public function test_correct_readings_in_romaji_or_kana(): void
+    {
+        $this->assertTrue(AnswerChecker::reading('shuujin', ['しゅうじん']));
+        $this->assertTrue(AnswerChecker::reading('syuujin', ['しゅうじん']));
+        $this->assertTrue(AnswerChecker::reading('shūjin', ['しゅうじん']));
+        $this->assertTrue(AnswerChecker::reading('シュウジン', ['しゅうじん']));
+        $this->assertTrue(AnswerChecker::reading('kyou', ['きょう']));
+        $this->assertTrue(AnswerChecker::reading(' Bourei ', ['ぼうれい']));
+    }
+
+    public function test_long_vowel_mark_equals_the_same_vowel_repeated(): void
+    {
+        $this->assertTrue(AnswerChecker::reading('ko-hi-', ['こーひー']));
+        $this->assertTrue(AnswerChecker::reading('koohii', ['こーひー']));
+        $this->assertTrue(AnswerChecker::reading('コーヒー', ['こーひー']));
+        $this->assertTrue(AnswerChecker::reading('こおひい', ['こーひー']));
+        $this->assertTrue(AnswerChecker::reading('こーひー', ['こおひい']));
+        $this->assertFalse(AnswerChecker::reading('kouhii', ['こーひー']));
+        $this->assertFalse(AnswerChecker::reading('kohi', ['こーひー']));
+    }
+
+    public function test_zu_and_ji_spellings_are_strict_in_kana_only(): void
+    {
+        $this->assertFalse(AnswerChecker::reading('つずく', ['つづく']));
+        $this->assertFalse(AnswerChecker::reading('ちじむ', ['ちぢむ']));
+        $this->assertFalse(AnswerChecker::reading('ちぢむ', ['ちじむ']));
+        $this->assertTrue(AnswerChecker::reading('つづく', ['つづく']));
+        $this->assertTrue(AnswerChecker::reading('tsuzuku', ['つづく'])); // Hepburn writes づ as zu
+        $this->assertTrue(AnswerChecker::reading('chijimu', ['ちぢむ']));
+        $this->assertFalse(AnswerChecker::reading('tsutsuku', ['つづく']));
+    }
+
+    public function test_kana_items_stay_loose_in_romaji(): void
+    {
+        $this->assertTrue(AnswerChecker::reading('zu', ['zu'])); // づ
+        $this->assertTrue(AnswerChecker::reading('dzu', ['zu']));
+        $this->assertTrue(AnswerChecker::reading('ji', ['ji'])); // ぢ
     }
 
     public function test_empty_reading_is_wrong(): void

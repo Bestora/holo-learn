@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Annotations\Decomposer;
 use App\Annotations\Verifier;
 use App\Japanese\Kana;
+use App\Models\DictWord;
 use App\Models\Item;
 use App\Models\Reference;
 use App\Models\User;
@@ -74,16 +75,38 @@ class DecomposerTest extends TestCase
         $this->assertSame([], $this->item('radical', '乙')->readings);
     }
 
-    public function test_vocab_readings_list_all_dictionary_readings(): void
+    public function test_vocab_readings_come_only_from_the_matched_entry(): void
     {
-        $reference = $this->annotated('song', '今日', 'こんにち', [['今日', 'こんにち']]);
+        DictWord::query()->forceCreate(['spelling' => '一番', 'reading' => 'いちばん', 'glosses' => [['number one', 'first'], ['best']], 'is_name' => false, 'common' => true]);
+        DictWord::query()->forceCreate(['spelling' => '一番', 'reading' => 'ひとつがい', 'glosses' => [['pair (of animals)']], 'is_name' => false, 'common' => false]);
+        $ichiban = $this->annotated('song', '一番', 'いちばん', [['一番', 'いちばん']]);
+        $kyou = $this->annotated('song', '今日', 'こんにち', [['今日', 'こんにち']]);
 
-        $this->verify($reference);
+        $this->verify($ichiban);
+        $this->verify($kyou);
 
-        $kyou = $this->item('vocab', '今日');
-        $this->assertSame(['きょう', 'こんにち'], $kyou->readings);
-        $this->assertSame(['today', 'these days'], $kyou->meanings);
-        $this->assertSame(['vocab:今日@0=こんにち'], $this->links($reference, 'vocab'));
+        $this->assertSame(['いちばん'], $this->item('vocab', '一番')->readings);
+        $this->assertSame(['number one', 'first', 'best'], $this->item('vocab', '一番')->meanings);
+        // without an entry id, rows with other glosses count as another entry (safe: fewer readings)
+        $this->assertSame(['こんにち'], $this->item('vocab', '今日')->readings);
+        $this->assertSame(['today', 'these days'], $this->item('vocab', '今日')->meanings);
+        $this->assertSame(['vocab:今日@0=こんにち'], $this->links($kyou, 'vocab'));
+    }
+
+    public function test_homograph_with_another_reading_does_not_link_to_the_existing_vocab(): void
+    {
+        DictWord::query()->forceCreate(['spelling' => '人気', 'reading' => 'にんき', 'glosses' => [['popularity']], 'is_name' => false, 'common' => true]);
+        DictWord::query()->forceCreate(['spelling' => '人気', 'reading' => 'ひとけ', 'glosses' => [['sign of life']], 'is_name' => false, 'common' => true]);
+        $ninki = $this->annotated('song', '人気', 'にんき', [['人気', 'にんき']]);
+        $hitoke = $this->annotated('song', '人気だ', 'ひとけだ', [['人気', 'ひとけ'], ['だ', 'だ']]);
+
+        $this->verify($ninki);
+        $this->verify($hitoke);
+
+        $this->assertSame(['にんき'], $this->item('vocab', '人気')->readings);
+        $this->assertSame(['vocab:人気@0=にんき'], $this->links($ninki, 'vocab'));
+        $this->assertSame([], $this->links($hitoke, 'vocab'));
+        $this->assertSame(['kanji:人@0=ひとけ'], $this->links($hitoke, 'kanji'));
     }
 
     public function test_word_without_dictionary_reading_links_only_kana(): void
@@ -347,7 +370,7 @@ class DecomposerTest extends TestCase
     public function test_items_get_levels_and_special_flags(): void
     {
         $this->verify($this->annotated('song', '花に亡霊', 'はなにぼうれい', [['花', 'はな'], ['に', 'に'], ['亡霊', 'ぼうれい']]));
-        $this->verify($this->annotated('song', '海賊団と湊と綺麗', 'かいぞくだんとみなとときれい', [['海賊団', 'かいぞくだん'], ['と', 'と'], ['湊', 'みなと'], ['と', 'と'], ['綺麗', 'きれい']]));
+        $this->verify($this->annotated('song', '海賊団と湊と綺麗', 'かいぞくだんとみなとときれい', [['海賊団', 'かいぞくだん'], ['と', 'と'], ['湊', 'みなと'], ['と', 'と'], ['綺麗', 'きれい']], 'Kaizokudan to Minato to Kirei', 'romaji'));
 
         $this->assertSame([10, false], $this->level('kanji', '花')); // old JLPT 4
         $this->assertSame([12, false], $this->level('kanji', '亡'));

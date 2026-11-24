@@ -55,8 +55,9 @@ class Decomposer
         $items = $this->items($wanted);
 
         $rows = [];
-        foreach ($links as [$key, $position, $context]) {
-            if (isset($items[$key])) {
+        foreach ($links as [$key, $position, $context, $reading]) {
+            // a homograph (人気 ひとけ) never links to the vocab item of another reading (にんき)
+            if (isset($items[$key]) && ($reading === null || in_array($reading, $items[$key]->readings, true))) {
                 $rows[] = ['item_id' => $items[$key]->id, 'position' => $position, 'context_reading' => $context];
             }
         }
@@ -106,7 +107,7 @@ class Decomposer
 
     /**
      * @param  array<string, ?Wanted>  $wanted
-     * @return list<array{string, int, ?string}> [item key, position, context reading]
+     * @return list<array{string, int, ?string, ?string}> [item key, position, context reading, reading the item must have]
      */
     private function links(Reference $ref, array &$wanted): array
     {
@@ -121,7 +122,7 @@ class Decomposer
             if (Kana::isKanaOnly($char)) {
                 $key = (Kana::toHiragana($char) === $char ? 'hiragana' : 'katakana').'|'.$char;
                 $wanted[$key] = null; // seeded kana only; small kana and ー have no item
-                $rows[] = [$key, $position, null];
+                $rows[] = [$key, $position, null, null];
             }
         }
 
@@ -152,16 +153,16 @@ class Decomposer
                     continue; // unknown kanji, or kana/々 inside the word
                 }
                 $level = ItemLevel::kanji($kanji->jlpt, $kanji->grade);
-                $rows[] = [self::want($wanted, 'kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings), $level), $position, $kanjiReading];
+                $rows[] = [self::want($wanted, 'kanji', $char, $kanji->readings['plain'], self::meanings($kanji->meanings), $level), $position, $kanjiReading, null];
                 foreach ($kanji->radicals as $radical) {
                     $radicalKanji[$radical][] = $level;
                     $source = $dictKanji[self::RADICAL_PARENTS[$radical] ?? ''] ?? $dictKanji[$radical] ?? null;
-                    $rows[] = [self::want($wanted, 'radical', $radical, [], $source === null ? [] : self::meanings($source->meanings), ItemLevel::radical($radicalKanji[$radical])), $position, null];
+                    $rows[] = [self::want($wanted, 'radical', $radical, [], $source === null ? [] : self::meanings($source->meanings), ItemLevel::radical($radicalKanji[$radical])), $position, null, null];
                 }
             }
         }
         foreach ($vocab as $i => $v) {
-            $rows[] = [self::want($wanted, 'vocab', $v['spelling'], $v['readings'], $v['meanings'], $v['level']), $aligned[$i][0][1], $words[$i]['reading']];
+            $rows[] = [self::want($wanted, 'vocab', $v['spelling'], $v['readings'], $v['meanings'], $v['level']), $aligned[$i][0][1], $words[$i]['reading'], $v['reading']];
         }
 
         return $rows;
