@@ -10,6 +10,7 @@ use App\Models\Review;
 use Carbon\CarbonImmutable;
 use Database\Seeders\KanaSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Inertia\Testing\AssertableInertia;
 use PHPUnit\Framework\Attributes\DataProvider;
 use Tests\TestCase;
@@ -316,6 +317,7 @@ class LearnTest extends TestCase
         $this->review($user, $ne, 2);
         $this->actingAs($user);
 
+        Http::fake(['www.youtube.com/oembed*' => Http::response('Not Found', 404)]); // YouTube confirms it is gone
         $card = $this->learnProps()['card'];
         $reference = Reference::query()->findOrFail($card['reference']['id']);
         $this->post(route('occurrences.dead', $reference->occurrences()->sole()))->assertNoContent();

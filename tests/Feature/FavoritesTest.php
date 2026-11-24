@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Item;
 use App\Models\Occurrence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Inertia\Testing\AssertableInertia;
 use Tests\TestCase;
@@ -90,6 +91,7 @@ class FavoritesTest extends TestCase
     public function test_marking_occurrences_dead_is_throttled_and_logged(): void
     {
         Log::spy();
+        Http::fake(['www.youtube.com/oembed*' => Http::response('Not Found', 404)]);
         $occurrence = $this->makeRef([[$this->makeItem('hiragana', 'ね', ['ne']), 0]])->occurrences()->sole();
         $user = $this->learner();
         $this->actingAs($user);
@@ -105,6 +107,7 @@ class FavoritesTest extends TestCase
     public function test_marking_an_occurrence_dead_is_idempotent(): void
     {
         $this->freezeTime();
+        Http::fake(['www.youtube.com/oembed*' => Http::response('Not Found', 404)]);
         $reference = $this->makeRef([[$this->makeItem('hiragana', 'ね', ['ne']), 0]]);
         $occurrence = $reference->occurrences()->sole();
         $this->actingAs($this->learner());
