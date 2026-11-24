@@ -1,16 +1,34 @@
+import { Link } from '@inertiajs/react';
+import { privacy } from '@/routes';
+
+// Notices required on every page (see PagesTest); string literals so formatting cannot split them.
+const NOTICE = [
+    'Inoffizielles Fanprojekt, nicht mit COVER Corp. verbunden.',
+    'Inhalte © COVER Corp. / jeweilige Rechteinhaber.',
+    'Wörterbuchdaten: JMdict, JMnedict, KANJIDIC2, KRADFILE © EDRDG (CC BY-SA 4.0).',
+    'Daten: Holodex.',
+].join(' ');
+
 export function AppFooter() {
     return (
-        <footer className="mt-auto flex flex-wrap justify-center gap-x-4 gap-y-1 p-4 text-center text-xs text-muted-foreground">
-            <a
-                href="https://holodex.net"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-4 hover:text-foreground"
-            >
-                Daten von Holodex
-            </a>
-            <span>Wörterbuchdaten: EDRDG</span>
-            <span>Fan-Projekt, nicht mit COVER Corp. verbunden</span>
+        <footer className="mx-auto mt-auto w-full max-w-3xl px-4 py-6 text-center text-xs leading-relaxed text-muted-foreground">
+            <p>{NOTICE}</p>
+            <p className="mt-2 flex justify-center gap-4">
+                <Link
+                    href={privacy()}
+                    className="underline underline-offset-4 hover:text-foreground"
+                >
+                    Datenschutz
+                </Link>
+                <a
+                    href="https://github.com/Bestora/holo-learn"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-foreground"
+                >
+                    GitHub
+                </a>
+            </p>
         </footer>
     );
 }

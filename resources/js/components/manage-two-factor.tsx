@@ -48,15 +48,14 @@ export default function ManageTwoFactor(props: Props) {
         <div className="space-y-6">
             <Heading
                 variant="small"
-                title="Two-factor authentication"
-                description="Manage your two-factor authentication settings"
+                title="Zwei-Faktor-Authentifizierung"
+                description="Zusätzlicher Code bei der Anmeldung"
             />
             {twoFactorEnabled ? (
                 <div className="flex flex-col items-start justify-start space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        You will be prompted for a secure, random pin during
-                        login, which you can retrieve from the TOTP-supported
-                        application on your phone.
+                        Bei der Anmeldung fragen wir nach einem Code aus der
+                        Authenticator-App auf deinem Handy.
                     </p>
 
                     <div className="relative inline">
@@ -67,7 +66,7 @@ export default function ManageTwoFactor(props: Props) {
                                     type="submit"
                                     disabled={processing}
                                 >
-                                    Disable 2FA
+                                    2FA ausschalten
                                 </Button>
                             )}
                         </Form>
@@ -82,17 +81,16 @@ export default function ManageTwoFactor(props: Props) {
             ) : (
                 <div className="flex flex-col items-start justify-start space-y-4">
                     <p className="text-sm text-muted-foreground">
-                        When you enable two-factor authentication, you will be
-                        prompted for a secure pin during login. This pin can be
-                        retrieved from a TOTP-supported application on your
-                        phone.
+                        Mit Zwei-Faktor-Authentifizierung fragen wir bei der
+                        Anmeldung nach einem Code aus einer Authenticator-App
+                        (TOTP) auf deinem Handy.
                     </p>
 
                     <div>
                         {hasSetupData ? (
                             <Button onClick={() => setShowSetupModal(true)}>
                                 <ShieldCheck />
-                                Continue setup
+                                Einrichtung fortsetzen
                             </Button>
                         ) : (
                             <Form
@@ -101,7 +99,7 @@ export default function ManageTwoFactor(props: Props) {
                             >
                                 {({ processing }) => (
                                     <Button type="submit" disabled={processing}>
-                                        Enable 2FA
+                                        2FA einschalten
                                     </Button>
                                 )}
                             </Form>

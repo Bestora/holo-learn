@@ -1,14 +1,160 @@
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { Heart, Search } from 'lucide-react';
+import { useState } from 'react';
+import { cn } from '@/lib/utils';
+import { index, update } from '@/routes/favorites';
 
-// Placeholder until the favorites UI exists: shows the raw props.
-export default function Favorites(props: Record<string, unknown>) {
+type FavoriteTalent = {
+    id: number;
+    name_ja: string;
+    name_en: string;
+    photo_url: string | null;
+    group_name: string | null;
+    is_favorite: boolean;
+};
+
+export default function Favorites({ talents }: { talents: FavoriteTalent[] }) {
+    const [query, setQuery] = useState('');
+    const [selected, setSelected] = useState(
+        () => new Set(talents.filter((t) => t.is_favorite).map((t) => t.id)),
+    );
+
+    const toggle = (id: number) => {
+        const next = new Set(selected);
+        if (next.has(id)) {
+            next.delete(id);
+        } else {
+            next.add(id);
+        }
+        setSelected(next);
+        router.put(
+            update.url(),
+            { talent_ids: [...next] },
+            { preserveScroll: true, preserveState: true },
+        );
+    };
+
+    const q = query.trim().toLowerCase();
+    const shown = talents.filter(
+        (t) =>
+            !q ||
+            t.name_en.toLowerCase().includes(q) ||
+            t.name_ja.includes(q) ||
+            (t.group_name ?? '').toLowerCase().includes(q),
+    );
+    // groups in the order of their first talent (the list comes sorted by priority)
+    const groups = new Map<string, FavoriteTalent[]>();
+    for (const t of shown) {
+        const key = t.group_name ?? 'Weitere';
+        groups.set(key, [...(groups.get(key) ?? []), t]);
+    }
+
     return (
         <>
             <Head title="Favoriten" />
-            <div className="p-4">
-                <h1 className="mb-4 text-xl font-semibold">Favoriten</h1>
-                <pre className="overflow-x-auto text-xs">{JSON.stringify(props, null, 2)}</pre>
+            <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:py-10">
+                <header className="flex flex-col gap-2">
+                    <h1 className="text-3xl font-extrabold">Deine Favoriten</h1>
+                    <p className="max-w-prose text-muted-foreground">
+                        Referenzen deiner Favoriten kommen in Lektionen öfter
+                        dran. Gespeichert wird sofort beim Antippen.
+                    </p>
+                </header>
+
+                <div className="sticky top-0 z-10 -mx-4 bg-background/90 px-4 py-2 backdrop-blur">
+                    <label className="relative block">
+                        <span className="sr-only">Talent suchen</span>
+                        <Search
+                            className="absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
+                            aria-hidden
+                        />
+                        <input
+                            type="search"
+                            value={query}
+                            onChange={(e) => setQuery(e.target.value)}
+                            placeholder="Name oder Gruppe suchen"
+                            className="min-h-12 w-full rounded-2xl border-2 border-input bg-card pr-4 pl-12 text-base focus:border-primary focus:ring-4 focus:ring-ring/30 focus:outline-none"
+                        />
+                    </label>
+                    <p
+                        className="mt-2 text-sm text-muted-foreground"
+                        aria-live="polite"
+                    >
+                        {selected.size === 0
+                            ? 'Noch keine Favoriten.'
+                            : `${selected.size} ${selected.size === 1 ? 'Favorit' : 'Favoriten'} ausgewählt.`}
+                    </p>
+                </div>
+
+                {[...groups].map(([group, list]) => (
+                    <section key={group} className="flex flex-col gap-3">
+                        <h2 className="text-lg font-bold">{group}</h2>
+                        <ul className="grid grid-cols-3 gap-3 sm:grid-cols-4 lg:grid-cols-6">
+                            {list.map((t) => {
+                                const on = selected.has(t.id);
+
+                                return (
+                                    <li key={t.id}>
+                                        <button
+                                            type="button"
+                                            aria-pressed={on}
+                                            onClick={() => toggle(t.id)}
+                                            className={cn(
+                                                'group flex w-full flex-col items-center gap-2 rounded-2xl border-2 p-2 pb-3 text-center transition-colors focus-visible:ring-4 focus-visible:ring-ring/40 focus-visible:outline-none',
+                                                on
+                                                    ? 'border-penlight bg-penlight-soft'
+                                                    : 'border-transparent bg-card hover:border-border',
+                                            )}
+                                        >
+                                            <span className="relative">
+                                                {t.photo_url ? (
+                                                    <img
+                                                        src={t.photo_url}
+                                                        alt=""
+                                                        loading="lazy"
+                                                        referrerPolicy="no-referrer"
+                                                        className={cn(
+                                                            'size-16 rounded-full bg-muted object-cover sm:size-20',
+                                                            !on &&
+                                                                'grayscale-[35%]',
+                                                        )}
+                                                    />
+                                                ) : (
+                                                    <span className="block size-16 rounded-full bg-muted sm:size-20" />
+                                                )}
+                                                {on && (
+                                                    <Heart
+                                                        className="absolute -right-1 -bottom-1 size-7 animate-pop rounded-full bg-background fill-penlight p-1 text-penlight"
+                                                        aria-hidden
+                                                    />
+                                                )}
+                                            </span>
+                                            <span className="text-sm leading-tight font-semibold">
+                                                {t.name_en}
+                                            </span>
+                                            <span
+                                                lang="ja"
+                                                className="text-xs leading-tight text-muted-foreground"
+                                            >
+                                                {t.name_ja}
+                                            </span>
+                                        </button>
+                                    </li>
+                                );
+                            })}
+                        </ul>
+                    </section>
+                ))}
+                {shown.length === 0 && (
+                    <p className="text-muted-foreground">
+                        Kein Talent passt zu „{query}“.
+                    </p>
+                )}
             </div>
         </>
     );
 }
+
+Favorites.layout = {
+    breadcrumbs: [{ title: 'Favoriten', href: index() }],
+};

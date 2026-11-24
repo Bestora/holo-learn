@@ -9,9 +9,24 @@
 
 @theme {
     --font-sans:
-        'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
+        'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+    --font-jp:
+        'Zen Maru Gothic', 'Hiragino Maru Gothic ProN', 'Hiragino Sans',
+        'Noto Sans JP', 'Yu Gothic', 'Meiryo', sans-serif;
+
+    --color-penlight: var(--penlight);
+    --color-penlight-soft: var(--penlight-soft);
+    --color-sky: var(--sky);
+    --color-correct: var(--correct);
+    --color-correct-soft: var(--correct-soft);
+    --color-wrong: var(--wrong);
+    --color-wrong-soft: var(--wrong-soft);
+
+    --animate-pop: pop 260ms cubic-bezier(0.2, 1.4, 0.4, 1);
+    --animate-shake: shake 320ms ease-in-out;
+    --animate-rise: rise 220ms ease-out;
 
     --radius-lg: var(--radius);
     --radius-md: calc(var(--radius) - 2px);
@@ -62,74 +77,91 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --destructive-foreground: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.87 0 0);
-    --chart-1: oklch(0.646 0.222 41.116);
-    --chart-2: oklch(0.6 0.118 184.704);
-    --chart-3: oklch(0.398 0.07 227.392);
-    --chart-4: oklch(0.828 0.189 84.429);
-    --chart-5: oklch(0.769 0.188 70.08);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.87 0 0);
+    /* holo-learn: indigo ink on cool paper; penlight pink marks what is being learned */
+    --background: #f4f5ff;
+    --foreground: #1e1b4b;
+    --card: #ffffff;
+    --card-foreground: #1e1b4b;
+    --popover: #ffffff;
+    --popover-foreground: #1e1b4b;
+    --primary: #4434e0;
+    --primary-foreground: #ffffff;
+    --secondary: #e9e9fb;
+    --secondary-foreground: #1e1b4b;
+    --muted: #ecedfa;
+    --muted-foreground: #5f5c8a;
+    --accent: #e6e4fd;
+    --accent-foreground: #1e1b4b;
+    --destructive: #d93a42;
+    --destructive-foreground: #d93a42;
+    --border: #dcdcf2;
+    --input: #d3d3ee;
+    --ring: #4434e0;
+    --chart-1: #4434e0;
+    --chart-2: #22c7e8;
+    --chart-3: #ff3d8b;
+    --chart-4: #0fa968;
+    --chart-5: #f5a524;
+    --radius: 0.875rem;
+    --sidebar: #eceefe;
+    --sidebar-foreground: #1e1b4b;
+    --sidebar-primary: #4434e0;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #dfdffb;
+    --sidebar-accent-foreground: #1e1b4b;
+    --sidebar-border: #dcdcf2;
+    --sidebar-ring: #4434e0;
+
+    --penlight: #ff3d8b;
+    --penlight-soft: #ffe0ec;
+    --sky: #22c7e8;
+    --correct: #0d9b5f;
+    --correct-soft: #dcf7ea;
+    --wrong: #d93a42;
+    --wrong-soft: #fde4e5;
 }
 
 .dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.145 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.145 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.985 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.396 0.141 25.723);
-    --destructive-foreground: oklch(0.637 0.237 25.331);
-    --border: oklch(0.269 0 0);
-    --input: oklch(0.269 0 0);
-    --ring: oklch(0.439 0 0);
-    --chart-1: oklch(0.488 0.243 264.376);
-    --chart-2: oklch(0.696 0.17 162.48);
-    --chart-3: oklch(0.769 0.188 70.08);
-    --chart-4: oklch(0.627 0.265 303.9);
-    --chart-5: oklch(0.645 0.246 16.439);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.985 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(0.269 0 0);
-    --sidebar-ring: oklch(0.439 0 0);
+    --background: #13112f;
+    --foreground: #eef0ff;
+    --card: #1d1a45;
+    --card-foreground: #eef0ff;
+    --popover: #1d1a45;
+    --popover-foreground: #eef0ff;
+    --primary: #8f86ff;
+    --primary-foreground: #13112f;
+    --secondary: #2a2660;
+    --secondary-foreground: #eef0ff;
+    --muted: #25224f;
+    --muted-foreground: #a9a6d6;
+    --accent: #2c2866;
+    --accent-foreground: #eef0ff;
+    --destructive: #ff6b72;
+    --destructive-foreground: #ff6b72;
+    --border: #312d6b;
+    --input: #3a3678;
+    --ring: #8f86ff;
+    --chart-1: #8f86ff;
+    --chart-2: #4dd8f0;
+    --chart-3: #ff6aa6;
+    --chart-4: #3ccf8e;
+    --chart-5: #f7b955;
+    --sidebar: #181539;
+    --sidebar-foreground: #eef0ff;
+    --sidebar-primary: #8f86ff;
+    --sidebar-primary-foreground: #13112f;
+    --sidebar-accent: #2a2660;
+    --sidebar-accent-foreground: #eef0ff;
+    --sidebar-border: #2a2660;
+    --sidebar-ring: #8f86ff;
+
+    --penlight: #ff6aa6;
+    --penlight-soft: #4a1f45;
+    --sky: #4dd8f0;
+    --correct: #3ccf8e;
+    --correct-soft: #173d33;
+    --wrong: #ff6b72;
+    --wrong-soft: #47202b;
 }
 
 @layer base {
@@ -139,5 +171,69 @@
 
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+/* Japanese text: always the rounded Japanese face, also inside Latin UI */
+:lang(ja) {
+    font-family: var(--font-jp);
+}
+
+/* the learned item inside a reference: lit like a penlight */
+.penlight {
+    color: var(--penlight);
+    text-shadow:
+        0 0 0.35em color-mix(in oklab, var(--penlight) 45%, transparent),
+        0 0 0.06em color-mix(in oklab, var(--penlight) 60%, transparent);
+}
+
+ruby rt {
+    font-size: 0.42em;
+    letter-spacing: 0.04em;
+}
+
+@keyframes pop {
+    0% {
+        transform: scale(0.94);
+    }
+    60% {
+        transform: scale(1.03);
+    }
+    100% {
+        transform: scale(1);
+    }
+}
+
+@keyframes shake {
+    0%,
+    100% {
+        transform: translateX(0);
+    }
+    25% {
+        transform: translateX(-6px);
+    }
+    75% {
+        transform: translateX(6px);
+    }
+}
+
+@keyframes rise {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 1ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 1ms !important;
     }
 }

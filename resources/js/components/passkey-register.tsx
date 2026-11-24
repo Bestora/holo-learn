@@ -51,7 +51,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
         await register(name);
     };
 
-    const handleCancel = () => {
+    const handleAbbrechen = () => {
         setShowForm(false);
         setName('');
     };
@@ -59,7 +59,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
     if (!isSupported) {
         return (
             <div className="text-sm text-muted-foreground">
-                Passkeys are not supported in this browser.
+                Dieser Browser unterstützt keine Passkeys.
             </div>
         );
     }
@@ -67,7 +67,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
     if (!showForm) {
         return (
             <Button variant="outline" onClick={() => setShowForm(true)}>
-                Add passkey
+                Passkey hinzufügen
             </Button>
         );
     }
@@ -78,7 +78,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
             className="space-y-4 rounded-lg border border-border bg-muted/50 p-4"
         >
             <div className="grid gap-2">
-                <Label htmlFor="passkey-name">Passkey name</Label>
+                <Label htmlFor="passkey-name">Name des Passkeys</Label>
                 <Input
                     id="passkey-name"
                     type="text"
@@ -89,7 +89,7 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
                     autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
-                    A name helps you identify this passkey later.
+                    Mit einem Namen erkennst du den Passkey später wieder.
                 </p>
             </div>
 
@@ -97,10 +97,10 @@ export default function PasskeyRegistration({ onSuccess }: Props) {
 
             <div className="flex gap-2">
                 <Button type="submit" disabled={isLoading || !name.trim()}>
-                    {isLoading ? 'Registering...' : 'Register passkey'}
+                    {isLoading ? 'Wird registriert …' : 'Passkey registrieren'}
                 </Button>
-                <Button type="button" variant="ghost" onClick={handleCancel}>
-                    Cancel
+                <Button type="button" variant="ghost" onClick={handleAbbrechen}>
+                    Abbrechen
                 </Button>
             </div>
         </form>
