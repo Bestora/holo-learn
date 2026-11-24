@@ -8,6 +8,7 @@ use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -24,6 +25,7 @@ use Laravel\Fortify\TwoFactorAuthenticatable;
  * @property Carbon|null $email_verified_at
  * @property string $password
  * @property bool $is_admin
+ * @property int|null $invitation_id
  * @property bool $specials_enabled
  * @property int $streak_days
  * @property CarbonImmutable|null $last_lesson_on
@@ -60,6 +62,12 @@ class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
             'last_lesson_on' => 'date',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    /** @return BelongsTo<Invitation, $this> */
+    public function invitation(): BelongsTo
+    {
+        return $this->belongsTo(Invitation::class);
     }
 
     /** @return HasMany<Review, $this> */

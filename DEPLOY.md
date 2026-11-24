@@ -109,7 +109,8 @@ Nach neuen Annotationen:
 cd /opt/holo-learn && git pull && docker compose exec scheduler php artisan annotations:import
 ```
 
-Weitere Einladung: `docker compose exec scheduler php artisan invite:create`
+Weitere Einladung: `docker compose exec scheduler php artisan invite:create` (Gruppenlink z. B. `--uses=10 --days=14`; Admin-Einladungen bleiben einmalig).
+Übersicht aller Einladungen: `docker compose exec scheduler php artisan invite:list`
 
 ## Wörterbuch monatlich aktualisieren
 

@@ -16,31 +16,31 @@ class CreateNewUser implements CreatesNewUsers
     use PasswordValidationRules, ProfileValidationRules;
 
     /**
-     * Validate and create a newly registered user. Registration requires an unused invitation,
-     * which is consumed in the same transaction that creates the user.
+     * Validate and create a newly registered user. Registration requires a redeemable invitation,
+     * one use of which is consumed in the same transaction that creates the user.
      *
      * @param  array<string, string>  $input
      */
     public function create(array $input): User
     {
-        $invalidInvite = 'Diese Einladung ist ungültig oder wurde bereits verwendet.';
+        $invalidInvite = 'This invitation is invalid or has already been used.';
 
         Validator::make($input, [
             ...$this->profileRules(),
             'password' => $this->passwordRules(),
             'invite' => ['required', 'string'],
         ], [
-            'invite.required' => 'Registrierung ist nur mit Einladung möglich.',
+            'invite.required' => 'You can only register with an invitation.',
             'invite.string' => $invalidInvite,
         ])->validate();
 
         return DB::transaction(function () use ($input, $invalidInvite) {
             $invitation = Invitation::firstWhere('token', $input['invite']);
 
-            // Conditional update so two concurrent registrations cannot both consume the invite.
-            $claimed = $invitation && Invitation::whereKey($invitation->id)
-                ->whereNull('used_at')
-                ->update(['used_at' => now()]);
+            // Conditional increment so concurrent registrations cannot exceed max_uses.
+            $claimed = $invitation?->isRedeemable() && Invitation::whereKey($invitation->id)
+                ->redeemable()
+                ->increment('uses', 1, ['used_at' => now()]);
 
             if (! $claimed) {
                 throw ValidationException::withMessages(['invite' => $invalidInvite]);
@@ -51,6 +51,7 @@ class CreateNewUser implements CreatesNewUsers
                 'email' => $input['email'],
                 'password' => $input['password'],
                 'is_admin' => $invitation->is_admin,
+                'invitation_id' => $invitation->id,
                 // The invitation is the trust anchor; there is no mail server to verify with.
                 'email_verified_at' => now(),
             ]);
