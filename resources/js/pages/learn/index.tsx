@@ -1,3 +1,4 @@
+import { HttpResponseError } from '@inertiajs/core';
 import { Head, Link, router } from '@inertiajs/react';
 import { Check, Flame, Sparkles, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -129,6 +130,7 @@ function CardView({ card }: { card: Card }) {
     const [failed, setFailed] = useState<{
         message: string;
         value: string;
+        retry: boolean;
     } | null>(null);
     const nextButton = useRef<HTMLButtonElement>(null);
     const isIntro = card.type === 'intro';
@@ -171,7 +173,15 @@ function CardView({ card }: { card: Card }) {
         } catch (error) {
             // stay on this card: the learner decides between retrying and reloading
             setChosen(null);
-            setFailed({ message: errorMessage(error), value });
+            setFailed({
+                message: errorMessage(error),
+                value,
+                // 422: the card is no longer current, retrying cannot help
+                retry: !(
+                    error instanceof HttpResponseError &&
+                    error.response.status === 422
+                ),
+            });
         } finally {
             setBusy(false);
         }
@@ -271,14 +281,16 @@ function CardView({ card }: { card: Card }) {
                 >
                     <p className="font-semibold text-wrong">{failed.message}</p>
                     <div className="flex flex-wrap justify-center gap-2">
-                        <button
-                            type="button"
-                            onClick={() => void submit(failed.value)}
-                            disabled={busy}
-                            className="min-h-11 rounded-xl bg-primary px-5 font-semibold text-primary-foreground disabled:opacity-60"
-                        >
-                            Try again
-                        </button>
+                        {failed.retry && (
+                            <button
+                                type="button"
+                                onClick={() => void submit(failed.value)}
+                                disabled={busy}
+                                className="min-h-11 rounded-xl bg-primary px-5 font-semibold text-primary-foreground disabled:opacity-60"
+                            >
+                                Try again
+                            </button>
+                        )}
                         <button
                             type="button"
                             onClick={() => router.reload()}

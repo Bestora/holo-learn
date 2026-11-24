@@ -93,7 +93,7 @@ docker compose exec scheduler php artisan annotations:import
 docker compose exec scheduler php artisan invite:create --admin # gibt den Registrierungslink aus
 ```
 
-`holodex:sync` läuft danach täglich um 03:30 (Sonntag 04:30 voll) über den `scheduler`.
+`holodex:sync` läuft danach Montag–Samstag um 03:30 und sonntags um 04:30 voll über den `scheduler`.
 Die Zeiten gelten in Europe/Berlin, weil `compose.yaml` `TZ` und `SCHEDULE_TIMEZONE` setzt;
 ohne diese Variablen wären es UTC. Zeitstempel in der Datenbank bleiben UTC.
 
@@ -111,11 +111,14 @@ cd /opt/holo-learn && git pull && docker compose exec scheduler php artisan anno
 
 Weitere Einladung: `docker compose exec scheduler php artisan invite:create` (Gruppenlink z. B. `--uses=10 --days=14`; Admin-Einladungen bleiben einmalig).
 Übersicht aller Einladungen: `docker compose exec scheduler php artisan invite:list`
+Passwort zurücksetzen (kein Mailserver, daher kein „Passwort vergessen“): `docker compose exec scheduler php artisan tinker --execute='App\Models\User::where("email", "name@example.com")->firstOrFail()->update(["password" => "neues-passwort"]);'`
 
 ## Wörterbuch monatlich aktualisieren
 
 Die EDRDG-Lizenz verlangt aktuelle Daten. Den Block „Wörterbuch“ aus der Erstbefüllung erneut
 ausführen; `dict:import` ersetzt die Wörter vollständig und aktualisiert die Kanji.
+Der Import sperrt die Datenbank für seine ganze Laufzeit (Schreibzugriffe warten bzw. scheitern):
+nachts ausführen oder vorher `docker compose exec app php artisan down` (danach `up`).
 
 ## Backup
 

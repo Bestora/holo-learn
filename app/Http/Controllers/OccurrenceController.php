@@ -18,9 +18,10 @@ class OccurrenceController extends Controller
      */
     public function dead(Request $request, Occurrence $occurrence): Response
     {
-        Log::info('occurrence marked dead', ['occurrence_id' => $occurrence->id, 'user_id' => $request->user()?->id]);
+        abort_if($occurrence->video_id === null, 404);
         if ($occurrence->dead_at === null && $this->goneOnYoutube($occurrence->video_id)) {
             $occurrence->update(['dead_at' => now()]);
+            Log::info('occurrence marked dead', ['occurrence_id' => $occurrence->id, 'user_id' => $request->user()?->id]);
         }
 
         return response()->noContent();

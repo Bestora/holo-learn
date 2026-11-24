@@ -83,6 +83,9 @@ class LessonFlow
         DB::transaction(function () use ($user, $itemId) {
             $user = $this->lockUser($user);
             [$lesson, $pending] = $this->pending($user, 'intro', $itemId);
+            if (! $this->cards->isValid($pending)) {
+                throw $this->stale(); // same as answer(): never start learning from an unverified reference
+            }
 
             Review::query()->firstOrCreate(
                 ['user_id' => $user->id, 'item_id' => $itemId],

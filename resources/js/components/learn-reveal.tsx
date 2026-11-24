@@ -401,7 +401,8 @@ export function RevealPanel({ card, reveal }: { card: Card; reveal: Reveal }) {
                 </div>
             )}
 
-            {voice && reveal.reading && (
+            {/* an unverified word's reading is never spoken as if it were right */}
+            {voice && reveal.reading && reveal.words.every((w) => w.ok) && (
                 <button
                     type="button"
                     onClick={speak}

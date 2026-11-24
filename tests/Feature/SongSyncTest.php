@@ -486,14 +486,14 @@ class SongSyncTest extends TestCase
         $this->assertSame('text', Schema::getColumnType('refs', 'alt_text'));
     }
 
-    public function test_scheduler_runs_incremental_daily_and_full_weekly(): void
+    public function test_scheduler_runs_incremental_monday_to_saturday_and_full_on_sunday(): void
     {
         $events = collect(app(Schedule::class)->events())
             ->filter(fn (Event $e) => str_contains((string) $e->command, 'holodex:sync'))
             ->mapWithKeys(fn (Event $e) => [mb_trim(mb_substr((string) $e->command, mb_strpos((string) $e->command, 'holodex:sync'))) => $e]);
 
         $this->assertEqualsCanonicalizing(['holodex:sync', 'holodex:sync --full'], $events->keys()->all());
-        $this->assertSame('30 3 * * *', $events['holodex:sync']->expression);
+        $this->assertSame('30 3 * * 1-6', $events['holodex:sync']->expression); // never next to the full run
         $this->assertSame('30 4 * * 0', $events['holodex:sync --full']->expression);
         $this->assertTrue($events->every(fn (Event $e) => $e->withoutOverlapping));
     }

@@ -373,6 +373,20 @@ class LearnTest extends TestCase
         $this->assertNotSame($card['reference']['id'], $this->learnProps()['card']['reference']['id']);
     }
 
+    public function test_an_intro_whose_reference_lost_verification_is_refused(): void
+    {
+        $a = $this->kana('あ');
+        $this->withRefs($a, 4);
+        $this->actingAs($this->learner());
+
+        $card = $this->learnProps()['card'];
+        $this->assertSame('intro', $card['type']);
+        Reference::query()->whereKey($card['reference']['id'])->update(['status' => 'rejected']);
+
+        $this->postJson(route('learn.intro'), ['item_id' => $a->id])->assertStatus(422);
+        $this->assertSame(0, Review::query()->count());
+    }
+
     public function test_nothing_due_reports_the_next_review(): void
     {
         $this->noNewItems();

@@ -6,6 +6,7 @@ use App\Models\Occurrence;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Tests\TestCase;
 
 /** A player error only marks an occurrence dead once YouTube's oEmbed confirms the video is gone. */
@@ -71,5 +72,33 @@ class OccurrenceDeadTest extends TestCase
         $this->post(route('occurrences.dead', $occurrence))->assertNoContent();
 
         $this->assertNull($occurrence->fresh()?->dead_at);
+    }
+
+    public function test_an_occurrence_without_video_is_not_found(): void
+    {
+        Http::preventStrayRequests();
+        $occurrence = $this->candidate();
+        $occurrence->update(['video_id' => null]);
+
+        $this->actingAs($this->learner())->post(route('occurrences.dead', $occurrence))->assertNotFound();
+
+        $this->assertNull($occurrence->fresh()?->dead_at);
+        Http::assertNothingSent();
+    }
+
+    public function test_marked_dead_is_logged_only_when_confirmed(): void
+    {
+        Http::preventStrayRequests();
+        Http::fake(['www.youtube.com/oembed*' => Http::sequence()->push('ok', 200)->push('Not Found', 404)]);
+        Log::spy();
+        $alive = $this->candidate();
+        $gone = $this->candidate();
+        $this->actingAs($this->learner());
+
+        $this->post(route('occurrences.dead', $alive))->assertNoContent();
+        Log::shouldNotHaveReceived('info', ['occurrence marked dead', \Mockery::any()]);
+
+        $this->post(route('occurrences.dead', $gone))->assertNoContent();
+        Log::shouldHaveReceived('info')->with('occurrence marked dead', \Mockery::on(fn (array $c) => $c['occurrence_id'] === $gone->id))->once();
     }
 }
